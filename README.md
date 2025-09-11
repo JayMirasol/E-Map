@@ -99,9 +99,10 @@ $env:Path="$env:JAVA_HOME\bin;$env:Path"
 java -version  # should show 17.x
 
 3) Install dependencies
+   
 flutter pub get
 
-4) Add required assets
+5) Add required assets
 
 Images (put your real files here):
 
