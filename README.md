@@ -132,3 +132,11 @@ Use JDK 17. See “Configure Java 17” above (Option A recommended).
 
 B) Gradle build path error with spaces
 Move the project to a path without spaces (e.g., C:\Dev\emap_mobile).
+
+👨‍💻 Contributing / Development
+
+Use VS Code with Flutter & Dart extensions.
+
+Follow the existing folder structure.
+
+Keep assets small and optimized; prefer SVG/PNG for floor images.
