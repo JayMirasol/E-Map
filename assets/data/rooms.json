@@ -1,0 +1,105 @@
+[
+  {"id":"BFO","name":"BFO","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"HUMAN_RESOURCES","name":"HUMAN RESOURCES","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"ACADEMIC_OFFICE","name":"ACADEMIC OFFICE","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"REGISTRAR","name":"REGISTRAR","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CDSO","name":"CDSO","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"OVPA","name":"OVPA","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"OFFICE_OF_PRESIDENT","name":"OFFICE OF PRESIDENT","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"BOARD_ROOM","name":"BOARD ROOM","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CGFO","name":"CGFO","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLINIC","name":"CLINIC","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"SASO","name":"SASO","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"COLD_KITCHEN_LABORATORY","name":"COLD KITCHEN LABORATORY","type":"lab","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"HOT_KITCHEN_LABORATORY","name":"HOT KITCHEN LABORATORY","type":"lab","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"APAG","name":"APAG","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"DANCE_STUDIO","name":"DANCE STUDIO","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"SCIENCE_LABORATORY","name":"SCIENCE LABORATORY","type":"lab","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CANTEEN","name":"CANTEEN","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"MISSO","name":"MISSO","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"FACULTY_ROOM","name":"FACULTY ROOM","type":"faculty","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLAB1","name":"CLAB1","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLAB2","name":"CLAB2","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLAB3","name":"CLAB3","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLAB4","name":"CLAB4","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"CLAB5","name":"CLAB5","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"SPEECH_LABORATORY","name":"SPEECH LABORATORY","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"STORAGE_ROOM","name":"STORAGE ROOM","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"COMFORT_ROOM_2F","name":"COMFORT ROOM","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R201","name":"R201","type":"classroom","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R202","name":"R202","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R203","name":"R203","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R204_CONTACT_CENTER","name":"R204 (CONTACT CENTER)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R205","name":"R205","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R206_FACULTY_ROOM_2","name":"R206 (FACULTY ROOM 2)","type":"faculty","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R207_HARDWARE_LAB","name":"R207 (HARDWARE LAB)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R208_ACCOUNTING_LAB","name":"R208 (ACCOUNTING LAB)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R209_TRC","name":"R209 (TRC)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R210_MOCK_TRAVEL","name":"R210 (MOCK TRAVEL)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R211_PSYCHE_LAB","name":"R211 (PSYCHE LAB)","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"PHEONIX_PUBLICATION","name":"PHEONIX PUBLICATION","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"LIBRARY","name":"LIBRARY","type":"office","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"BLIS_LAB","name":"BLIS LAB","type":"lab","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"L302","name":"L302","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L303","name":"L303","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L304","name":"L304","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L305","name":"L305","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L306","name":"L306","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L307","name":"L307","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L308","name":"L308","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L309","name":"L309","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"L310_ICSLIS_FACULTY_ROOM","name":"L310 (ICSLIS FACULTY ROOM)","type":"faculty","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"COMFORT_ROOM_3F","name":"COMFORT ROOM","type":"office","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R301_INTERNET_ROOM","name":"R301 (INTERNET ROOM)","type":"lab","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R302","name":"R302","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R303","name":"R303","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R304","name":"R304","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R305","name":"R305","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R306","name":"R306","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R307","name":"R307","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R308","name":"R308","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R309","name":"R309","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R310","name":"R310","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R311_AVR","name":"R311 (AUDIO VISUAL ROOM)","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"MULTI_PURPOSE_HALL","name":"MULTI-PURPOSE HALL","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"L401","name":"L401","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L402","name":"L402","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L403","name":"L403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L404","name":"L404","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L405","name":"L405","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L406","name":"L406","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L407","name":"L407","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L408","name":"L408","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L409","name":"L409","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"COMFORT_ROOM_4F","name":"COMFORT ROOM","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"MUSIC_ROOM","name":"MUSIC ROOM","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+
+  {"id":"R401","name":"R401","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R402","name":"R402","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R403","name":"R403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R404","name":"R404","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R405","name":"R405","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R406","name":"R406","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R407","name":"R407","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R408","name":"R408","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R409","name":"R409","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R410","name":"R410","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R411","name":"R411","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null}
+]
