@@ -79,9 +79,10 @@ or any OpenJDK 17 distribution
 
 1) Clone
 git clone https://github.com/<your-username>/emap_mobile.git
+
 cd emap_mobile
 
-2) Configure Java 17 (choose one)
+3) Configure Java 17 (choose one)
 
 Option A – Project-local (easiest):
 Edit android/gradle.properties and add:
