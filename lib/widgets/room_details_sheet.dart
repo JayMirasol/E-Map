@@ -121,10 +121,10 @@ class _RoomDetailsSheetState extends State<RoomDetailsSheet> {
 
             // Schedule list (full day for this room)
             if (schedules.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18.0),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18.0),
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.event_busy),
                     SizedBox(width: 8),
                     Expanded(child: Text('No classes scheduled for this day.')),

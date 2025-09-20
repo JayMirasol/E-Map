@@ -29,7 +29,7 @@ class FloorplanScreen extends StatelessWidget {
           // Only jump once per build frame:
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final ctrl = DefaultTabController.of(context);
-            if (ctrl != null && floorIndex >= 0) ctrl.index = floorIndex;
+            if (floorIndex >= 0) ctrl.index = floorIndex;
           });
         }
 
@@ -281,11 +281,11 @@ class _Hotspot extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black26,
                     blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),

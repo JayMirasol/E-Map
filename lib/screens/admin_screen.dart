@@ -239,7 +239,8 @@ class _ScheduleFormState extends State<_ScheduleForm> {
               const SizedBox(height: 10),
 
               DropdownButtonFormField<String>(
-                value: _roomId ?? (rooms.isNotEmpty ? rooms.first.id : null),
+                initialValue:
+                    _roomId ?? (rooms.isNotEmpty ? rooms.first.id : null),
                 items: rooms
                     .map(
                       (r) => DropdownMenuItem(value: r.id, child: Text(r.name)),
@@ -254,7 +255,7 @@ class _ScheduleFormState extends State<_ScheduleForm> {
               const SizedBox(height: 10),
 
               DropdownButtonFormField<String>(
-                value: _day,
+                initialValue: _day,
                 items: CampusProvider.days
                     .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                     .toList(),
