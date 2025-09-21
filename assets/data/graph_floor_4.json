@@ -1,0 +1,556 @@
+{
+  "metadata": {
+    "floor": 4,
+    "title": "4th Floor Corridor Graph (A* Auto-routing)",
+    "coordinate_space": {
+      "width": 1000,
+      "height": 1000,
+      "units": "px"
+    },
+    "notes": "Corridor is a rectangle around the Multi\u2011Purpose Hall. Nodes include corridor waypoints and room-door anchors."
+  },
+  "nodes": {
+    "NW": {
+      "x": 150,
+      "y": 150,
+      "type": "corridor"
+    },
+    "NE": {
+      "x": 850,
+      "y": 150,
+      "type": "corridor"
+    },
+    "SE": {
+      "x": 850,
+      "y": 700,
+      "type": "corridor"
+    },
+    "SW": {
+      "x": 150,
+      "y": 700,
+      "type": "corridor"
+    },
+    "N": {
+      "x": 500,
+      "y": 150,
+      "type": "corridor"
+    },
+    "S": {
+      "x": 500,
+      "y": 700,
+      "type": "corridor"
+    },
+    "E": {
+      "x": 850,
+      "y": 425,
+      "type": "corridor"
+    },
+    "W": {
+      "x": 150,
+      "y": 425,
+      "type": "corridor"
+    },
+    "W1": {
+      "x": 150,
+      "y": 250,
+      "type": "corridor"
+    },
+    "W2": {
+      "x": 150,
+      "y": 450,
+      "type": "corridor"
+    },
+    "W3": {
+      "x": 150,
+      "y": 650,
+      "type": "corridor"
+    },
+    "E1": {
+      "x": 850,
+      "y": 250,
+      "type": "corridor"
+    },
+    "E2": {
+      "x": 850,
+      "y": 450,
+      "type": "corridor"
+    },
+    "E3": {
+      "x": 850,
+      "y": 650,
+      "type": "corridor"
+    },
+    "d_L406": {
+      "x": 150,
+      "y": 200,
+      "type": "door",
+      "room": "L406"
+    },
+    "d_L405": {
+      "x": 150,
+      "y": 260,
+      "type": "door",
+      "room": "L405"
+    },
+    "d_L403": {
+      "x": 150,
+      "y": 400,
+      "type": "door",
+      "room": "L403"
+    },
+    "d_L402": {
+      "x": 150,
+      "y": 460,
+      "type": "door",
+      "room": "L402"
+    },
+    "d_L401": {
+      "x": 150,
+      "y": 600,
+      "type": "door",
+      "room": "L401"
+    },
+    "d_ComfortRoom": {
+      "x": 150,
+      "y": 740,
+      "type": "door",
+      "room": "Comfort Room"
+    },
+    "d_R405": {
+      "x": 850,
+      "y": 220,
+      "type": "door",
+      "room": "R405"
+    },
+    "d_R404": {
+      "x": 850,
+      "y": 280,
+      "type": "door",
+      "room": "R404"
+    },
+    "d_R403": {
+      "x": 850,
+      "y": 420,
+      "type": "door",
+      "room": "R403"
+    },
+    "d_R402": {
+      "x": 850,
+      "y": 480,
+      "type": "door",
+      "room": "R402"
+    },
+    "d_R401": {
+      "x": 850,
+      "y": 620,
+      "type": "door",
+      "room": "R401"
+    },
+    "d_MusicRoomOuter": {
+      "x": 850,
+      "y": 760,
+      "type": "door",
+      "room": "Music Room (Outer)"
+    },
+    "d_MPH": {
+      "x": 500,
+      "y": 650,
+      "type": "door",
+      "room": "Multi-Purpose Hall"
+    },
+    "d_MusicRoomInner": {
+      "x": 700,
+      "y": 650,
+      "type": "door",
+      "room": "Music Room (Inner)"
+    }
+  },
+  "edges": [
+    {
+      "from": "NW",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NW",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NE",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E1",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E3",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SE",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SW",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W3",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W1",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W",
+      "to": "W2",
+      "cost": 25.0
+    },
+    {
+      "from": "W2",
+      "to": "W",
+      "cost": 25.0
+    },
+    {
+      "from": "E",
+      "to": "E2",
+      "cost": 25.0
+    },
+    {
+      "from": "E2",
+      "to": "E",
+      "cost": 25.0
+    },
+    {
+      "from": "W1",
+      "to": "W",
+      "cost": 175.0
+    },
+    {
+      "from": "W",
+      "to": "W1",
+      "cost": 175.0
+    },
+    {
+      "from": "W3",
+      "to": "W",
+      "cost": 225.0
+    },
+    {
+      "from": "W",
+      "to": "W3",
+      "cost": 225.0
+    },
+    {
+      "from": "E1",
+      "to": "E",
+      "cost": 175.0
+    },
+    {
+      "from": "E",
+      "to": "E1",
+      "cost": 175.0
+    },
+    {
+      "from": "E3",
+      "to": "E",
+      "cost": 225.0
+    },
+    {
+      "from": "E",
+      "to": "E3",
+      "cost": 225.0
+    },
+    {
+      "from": "d_L406",
+      "to": "W1",
+      "cost": 50.0
+    },
+    {
+      "from": "W1",
+      "to": "d_L406",
+      "cost": 50.0
+    },
+    {
+      "from": "d_L405",
+      "to": "W1",
+      "cost": 10.0
+    },
+    {
+      "from": "W1",
+      "to": "d_L405",
+      "cost": 10.0
+    },
+    {
+      "from": "d_L403",
+      "to": "W2",
+      "cost": 50.0
+    },
+    {
+      "from": "W2",
+      "to": "d_L403",
+      "cost": 50.0
+    },
+    {
+      "from": "d_L402",
+      "to": "W2",
+      "cost": 10.0
+    },
+    {
+      "from": "W2",
+      "to": "d_L402",
+      "cost": 10.0
+    },
+    {
+      "from": "d_L401",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "d_L401",
+      "cost": 50.0
+    },
+    {
+      "from": "d_ComfortRoom",
+      "to": "SW",
+      "cost": 40.0
+    },
+    {
+      "from": "SW",
+      "to": "d_ComfortRoom",
+      "cost": 40.0
+    },
+    {
+      "from": "d_R405",
+      "to": "E1",
+      "cost": 30.0
+    },
+    {
+      "from": "E1",
+      "to": "d_R405",
+      "cost": 30.0
+    },
+    {
+      "from": "d_R404",
+      "to": "E1",
+      "cost": 30.0
+    },
+    {
+      "from": "E1",
+      "to": "d_R404",
+      "cost": 30.0
+    },
+    {
+      "from": "d_R403",
+      "to": "E2",
+      "cost": 30.0
+    },
+    {
+      "from": "E2",
+      "to": "d_R403",
+      "cost": 30.0
+    },
+    {
+      "from": "d_R402",
+      "to": "E2",
+      "cost": 30.0
+    },
+    {
+      "from": "E2",
+      "to": "d_R402",
+      "cost": 30.0
+    },
+    {
+      "from": "d_R401",
+      "to": "E3",
+      "cost": 30.0
+    },
+    {
+      "from": "E3",
+      "to": "d_R401",
+      "cost": 30.0
+    },
+    {
+      "from": "d_MusicRoomOuter",
+      "to": "SE",
+      "cost": 60.0
+    },
+    {
+      "from": "SE",
+      "to": "d_MusicRoomOuter",
+      "cost": 60.0
+    },
+    {
+      "from": "d_MPH",
+      "to": "S",
+      "cost": 50.0
+    },
+    {
+      "from": "S",
+      "to": "d_MPH",
+      "cost": 50.0
+    },
+    {
+      "from": "d_MusicRoomInner",
+      "to": "E3",
+      "cost": 150.0
+    },
+    {
+      "from": "E3",
+      "to": "d_MusicRoomInner",
+      "cost": 150.0
+    },
+    {
+      "from": "d_MusicRoomInner",
+      "to": "S",
+      "cost": 206.16
+    },
+    {
+      "from": "S",
+      "to": "d_MusicRoomInner",
+      "cost": 206.16
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    }
+  ],
+  "rooms": {
+    "L406": "d_L406",
+    "L405": "d_L405",
+    "L403": "d_L403",
+    "L402": "d_L402",
+    "L401": "d_L401",
+    "Comfort Room": "d_ComfortRoom",
+    "R405": "d_R405",
+    "R404": "d_R404",
+    "R403": "d_R403",
+    "R402": "d_R402",
+    "R401": "d_R401",
+    "Music Room (Outer)": "d_MusicRoomOuter",
+    "Multi-Purpose Hall": "d_MPH",
+    "Music Room (Inner)": "d_MusicRoomInner"
+  }
+}

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
 import '../models/room.dart';
 import '../models/schedule.dart';
+import '../models/floor_graph.dart';
 import '../services/local_store.dart';
 
 class CampusProvider with ChangeNotifier {
@@ -17,6 +18,9 @@ class CampusProvider with ChangeNotifier {
 
   static const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  final Map<int, FloorGraph> _floorGraphs = {};
+  FloorGraph? graphForFloor(int floor) => _floorGraphs[floor];
+
   Future<void> load() async {
     // Rooms still from assets for now
     if (_rooms.isEmpty) {
@@ -25,11 +29,24 @@ class CampusProvider with ChangeNotifier {
           .map((e) => Room.fromJson(e))
           .toList();
     }
-
     // Schedules from local document storage (seeded from assets on first run)
     final rows = await LocalStore.readSchedules();
     _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
     notifyListeners();
+    await _loadGraphs();
+  }
+
+  Future<void> _loadGraphs() async {
+    for (final f in [1, 2, 3, 4]) {
+      final path = 'assets/data/graph_floor_$f.json';
+      try {
+        final txt = await rootBundle.loadString(path);
+        final j = jsonDecode(txt) as Map<String, dynamic>;
+        _floorGraphs[f] = FloorGraph.fromJson(j);
+      } catch (_) {
+        // If file missing, skip; auto-routing just won’t be available for that floor
+      }
+    }
   }
 
   void selectRoom(String? id) {

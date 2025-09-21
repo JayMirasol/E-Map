@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
-import '../widgets/room_details_sheet.dart';
 import '../models/room.dart';
 import '../widgets/room_search.dart';
+import '../models/floor_graph.dart';
+import '../core/pathfinding.dart';
 
 class FloorplanScreen extends StatelessWidget {
   const FloorplanScreen({super.key});
@@ -16,22 +17,7 @@ class FloorplanScreen extends StatelessWidget {
     return FutureBuilder(
       future: context.read<CampusProvider>().load(),
       builder: (_, __) {
-        final p = context.watch<CampusProvider>();
-        final selectedId = p.selectedRoomId;
-        if (selectedId != null) {
-          final r = p.rooms.firstWhere(
-            (x) => x.id == selectedId,
-            orElse: () => p.rooms.first,
-          );
-          final floorIndex = (r.floor != null
-              ? FloorplanScreen.floors.indexOf(r.floor!)
-              : 0);
-          // Only jump once per build frame:
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final ctrl = DefaultTabController.of(context);
-            if (floorIndex >= 0) ctrl.index = floorIndex;
-          });
-        }
+        final rooms = context.watch<CampusProvider>().rooms;
 
         return DefaultTabController(
           length: floors.length,
@@ -45,9 +31,7 @@ class FloorplanScreen extends StatelessWidget {
             ),
             body: TabBarView(
               children: floors.map((f) {
-                final roomsOnFloor = p.rooms
-                    .where((r) => r.floor == f)
-                    .toList();
+                final roomsOnFloor = rooms.where((r) => r.floor == f).toList();
                 return _FloorCanvas(
                   floor: f,
                   imagePath: imageFor(f),
@@ -79,6 +63,15 @@ class _FloorCanvas extends StatefulWidget {
 
 class _FloorCanvasState extends State<_FloorCanvas> {
   final TransformationController _tc = TransformationController();
+  final GlobalKey _canvasKey = GlobalKey();
+
+  Room? _startRoom;
+  Room? _endRoom;
+
+  // NEW: waypoint support
+  final List<Offset> _waypoints =
+      []; // in canvas logical px (after fx/fy -> px)
+  bool _addingWaypoint = false;
 
   @override
   void dispose() {
@@ -86,159 +79,371 @@ class _FloorCanvasState extends State<_FloorCanvas> {
     super.dispose();
   }
 
+  Future<void> _chooseStart() async {
+    final selected = await showSearch<Room?>(
+      context: context,
+      delegate: RoomSearchDelegate(source: widget.rooms),
+    );
+    if (selected != null) {
+      setState(() {
+        _startRoom = selected;
+        _endRoom = null; // reset destination when start changes
+        _waypoints.clear(); // reset path shape
+        _addingWaypoint = false;
+      });
+    }
+  }
+
+  Future<void> _chooseDest() async {
+    final selected = await showSearch<Room?>(
+      context: context,
+      delegate: RoomSearchDelegate(source: widget.rooms),
+    );
+    if (selected != null) {
+      setState(() {
+        _endRoom = selected;
+        // keep waypoints
+        _addingWaypoint = false;
+      });
+    }
+  }
+
+  // Optional helper: add a waypoint at a chosen room center (via search)
+  Future<void> _addWaypointFromRoom() async {
+    final selected = await showSearch<Room?>(
+      context: context,
+      delegate: RoomSearchDelegate(source: widget.rooms),
+    );
+    if (selected != null && selected.fx != null && selected.fy != null) {
+      final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) return;
+      final size = box.size;
+      setState(() {
+        _waypoints.add(
+          Offset(selected.fx! * size.width, selected.fy! * size.height),
+        );
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This room has no fx/fy yet. Long-press to capture coordinates.',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _clearPath() {
+    setState(() {
+      _startRoom = null;
+      _endRoom = null;
+      _waypoints.clear();
+      _addingWaypoint = false;
+    });
+  }
+
+  Offset? _roomOffset(Room? r, double w, double h) {
+    if (r == null || r.fx == null || r.fy == null) return null;
+    return Offset(r.fx! * w, r.fy! * h);
+  }
+
+  Widget _buildHotspot(Room r, Size parentSize, Color color) {
+    final dx = (r.fx ?? 0) * parentSize.width;
+    final dy = (r.fy ?? 0) * parentSize.height;
+
+    return Positioned(
+      left: dx - 14,
+      top: dy - 14,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.place, size: 16, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.9),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.black12),
+            ),
+            child: Text(
+              r.name,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build a simple polyline: start -> waypoints -> end
+  List<Offset> _buildPathPoints(double w, double h) {
+    final points = <Offset>[];
+    final start = _roomOffset(_startRoom, w, h);
+    final end = _roomOffset(_endRoom, w, h);
+
+    if (start != null) points.add(start);
+    points.addAll(_waypoints); // already in canvas pixel coords
+    if (end != null) points.add(end);
+
+    return points;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final p = context.watch<CampusProvider>();
-    final mapped = widget.rooms
-        .where((r) => r.fx != null && r.fy != null)
-        .toList();
-    final unmappedCount = widget.rooms.length - mapped.length;
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        Future<void> jumpTo(Room r) async {
-          if (r.fx == null || r.fy == null) return;
-          final w = constraints.maxWidth;
-          final h = constraints.maxHeight;
-          final target = Offset(r.fx! * w, r.fy! * h);
-          const scale = 3.0; // zoom level when jumping
-          final center = Offset(w / 2, h / 2);
-          final translation = center - target * scale;
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
 
-          // Apply transform (scale, then translate)
-          _tc.value = Matrix4.identity()
-            ..translate(translation.dx, translation.dy)
-            ..scale(scale);
+        final startPos = _roomOffset(_startRoom, w, h);
+        final endPos = _roomOffset(_endRoom, w, h);
 
-          // Open details
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            builder: (_) => DraggableScrollableSheet(
-              initialChildSize: 0.5,
-              minChildSize: 0.3,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (ctx, sc) => SingleChildScrollView(
-                controller: sc,
-                child: RoomDetailsSheet(room: r),
-              ),
-            ),
-          );
-        }
+        final hasStart = _startRoom != null && startPos != null;
+        final hasEnd = _endRoom != null && endPos != null;
 
-        final canvas = GestureDetector(
-          onLongPressStart: (d) {
-            // Calibration helper (unchanged)
-            final inv = Matrix4.inverted(_tc.value);
-            final box = context.findRenderObject() as RenderBox?;
-            if (box == null) return;
-            final local = box.globalToLocal(d.globalPosition);
-            final pos = MatrixUtils.transformPoint(inv, local);
-            final w = constraints.maxWidth;
-            final h = constraints.maxHeight;
-            final fx = (pos.dx / w).clamp(0.0, 1.0);
-            final fy = (pos.dy / h).clamp(0.0, 1.0);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Floor ${widget.floor} fx=${fx.toStringAsFixed(3)}, fy=${fy.toStringAsFixed(3)}',
-                ),
-              ),
-            );
-          },
-          child: Stack(
-            children: [
-              if (unmappedCount > 0)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: _Badge(text: '$unmappedCount unmapped'),
-                ),
-              InteractiveViewer(
-                transformationController: _tc,
-                minScale: 0.7,
-                maxScale: 6,
+        final pathPoints = _buildPathPoints(w, h);
+
+        return Stack(
+          children: [
+            // Map + overlays
+            InteractiveViewer(
+              transformationController: _tc,
+              minScale: 0.7,
+              maxScale: 6,
+              child: SizedBox.expand(
+                key: _canvasKey,
                 child: Stack(
                   children: [
                     Positioned.fill(
                       child: Image.asset(widget.imagePath, fit: BoxFit.contain),
                     ),
-                    ...mapped.map(
-                      (r) => _Hotspot(
-                        room: r,
-                        parentSize: Size(
-                          constraints.maxWidth,
-                          constraints.maxHeight,
+
+                    // Polyline path (start -> waypoints -> end)
+                    if (pathPoints.length >= 2)
+                      CustomPaint(
+                        painter: _PolylinePainter(points: pathPoints),
+                        size: Size(w, h),
+                      ),
+
+                    // Show ONLY the selected Start and Destination
+                    if (hasStart)
+                      _buildHotspot(_startRoom!, Size(w, h), Colors.green),
+                    if (hasEnd)
+                      _buildHotspot(_endRoom!, Size(w, h), Colors.red),
+
+                    // Optional: draw small dots for waypoints
+                    ..._waypoints.map(
+                      (pt) => Positioned(
+                        left: pt.dx - 6,
+                        top: pt.dy - 6,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.deepPurple,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        occupied: p.isRoomOccupiedNow(r.id),
-                        onTap: () => jumpTo(r),
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        );
+            ),
 
-        // Add a floating search button for this floor
-        return Stack(
-          children: [
-            canvas,
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: FloatingActionButton(
-                heroTag: 'search-floor-${widget.floor}',
-                onPressed: () async {
-                  final roomsOnThisFloor = widget
-                      .rooms; // search all rooms on floor, even if not mapped yet
-                  final selected = await showSearch<Room?>(
-                    context: context,
-                    delegate: RoomSearchDelegate(source: roomsOnThisFloor),
+            // Long-press handler:
+            // - if adding waypoint: drop a waypoint at pressed spot (in canvas logical px)
+            // - else: calibration readout
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onLongPressStart: (details) {
+                  final box =
+                      _canvasKey.currentContext?.findRenderObject()
+                          as RenderBox?;
+                  if (box == null) return;
+
+                  final localOnCanvas = box.globalToLocal(
+                    details.globalPosition,
                   );
-                  if (selected != null) {
-                    // If not mapped yet, just open details (no jump possible)
-                    if (selected.fx == null || selected.fy == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Room has no floor coordinates yet. Long-press to calibrate and set fx/fy in rooms.json.',
-                          ),
+                  final inv = Matrix4.inverted(_tc.value);
+                  final logical = MatrixUtils.transformPoint(
+                    inv,
+                    localOnCanvas,
+                  );
+
+                  final fx = (logical.dx / w).clamp(0.0, 1.0);
+                  final fy = (logical.dy / h).clamp(0.0, 1.0);
+
+                  if (_addingWaypoint) {
+                    // add waypoint at logical px position
+                    setState(() {
+                      _waypoints.add(Offset(fx * w, fy * h));
+                      _addingWaypoint = false;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Waypoint added.')),
+                    );
+                  } else {
+                    // calibration readout
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Floor ${widget.floor} fx=${fx.toStringAsFixed(3)}, fy=${fy.toStringAsFixed(3)}',
                         ),
-                      );
-                      // Still open details:
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(16),
-                          ),
-                        ),
-                        builder: (_) => DraggableScrollableSheet(
-                          initialChildSize: 0.5,
-                          minChildSize: 0.3,
-                          maxChildSize: 0.9,
-                          expand: false,
-                          builder: (ctx, sc) => SingleChildScrollView(
-                            controller: sc,
-                            child: RoomDetailsSheet(room: selected),
-                          ),
-                        ),
-                      );
-                    } else {
-                      await jumpTo(selected);
-                    }
+                      ),
+                    );
                   }
                 },
-                child: const Icon(Icons.search),
+              ),
+            ),
+
+            // Controls row
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: [
+                  // Choose Start (green when selected)
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _startRoom != null
+                            ? Colors.green
+                            : null,
+                        foregroundColor: _startRoom != null
+                            ? Colors.white
+                            : null,
+                      ),
+                      onPressed: _chooseStart,
+                      child: Text(
+                        _startRoom == null
+                            ? 'Choose Start'
+                            : 'Start: ${_startRoom!.name}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Choose Destination (red when selected)
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _endRoom != null ? Colors.red : null,
+                        foregroundColor: _endRoom != null ? Colors.white : null,
+                      ),
+                      onPressed: _startRoom == null ? null : _chooseDest,
+                      child: Text(
+                        _endRoom == null
+                            ? 'Choose Destination'
+                            : 'Dest: ${_endRoom!.name}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // NEW: Add Waypoint (enabled when start is set)
+                  SizedBox(
+                    width: 56,
+                    height: 48,
+                    child: Tooltip(
+                      message: _startRoom == null
+                          ? 'Choose a Start first'
+                          : (_addingWaypoint
+                                ? 'Long-press to drop waypoint'
+                                : 'Add Waypoint'),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _addingWaypoint
+                              ? Colors.deepPurple.shade100
+                              : Colors.grey.shade200,
+                          foregroundColor: Colors.black87,
+                          padding: EdgeInsets.zero,
+                        ),
+                        onPressed: _startRoom == null
+                            ? null
+                            : () {
+                                setState(() {
+                                  _addingWaypoint = true;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Long-press on the map to place a waypoint',
+                                    ),
+                                  ),
+                                );
+                              },
+                        child: const Icon(Icons.add_road),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // (Optional) Add waypoint from a room center, via search
+                  SizedBox(
+                    width: 56,
+                    height: 48,
+                    child: Tooltip(
+                      message: 'Add waypoint from room',
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade200,
+                          foregroundColor: Colors.black87,
+                          padding: EdgeInsets.zero,
+                        ),
+                        onPressed: _startRoom == null
+                            ? null
+                            : _addWaypointFromRoom,
+                        child: const Icon(Icons.add_location_alt),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Clear Path
+                  SizedBox(
+                    width: 56,
+                    height: 48,
+                    child: Tooltip(
+                      message: 'Clear Path',
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade200,
+                          foregroundColor: Colors.black87,
+                          padding: EdgeInsets.zero,
+                        ),
+                        onPressed:
+                            (_startRoom != null ||
+                                _endRoom != null ||
+                                _waypoints.isNotEmpty)
+                            ? _clearPath
+                            : null,
+                        child: const Icon(Icons.clear),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -248,90 +453,36 @@ class _FloorCanvasState extends State<_FloorCanvas> {
   }
 }
 
-class _Hotspot extends StatelessWidget {
-  final Room room;
-  final Size parentSize;
-  final bool occupied;
-  final VoidCallback onTap;
+class _PolylinePainter extends CustomPainter {
+  final List<Offset> points;
 
-  const _Hotspot({
-    required this.room,
-    required this.parentSize,
-    required this.occupied,
-    required this.onTap,
-  });
+  _PolylinePainter({required this.points});
 
   @override
-  Widget build(BuildContext context) {
-    final dx = (room.fx ?? 0) * parentSize.width;
-    final dy = (room.fy ?? 0) * parentSize.height;
-    final color = occupied ? Colors.orange : Colors.blue;
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
 
-    return Positioned(
-      left: dx - 14,
-      top: dy - 14,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.place, size: 16, color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withOpacity(.9),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.black12),
-              ),
-              child: Text(
-                room.name,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+
+    final paint = Paint()
+      ..color = Colors.deepPurple
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawPath(path, paint);
   }
-}
 
-class _Badge extends StatelessWidget {
-  final String text;
-  const _Badge({required this.text});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.6),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+  bool shouldRepaint(covariant _PolylinePainter old) {
+    if (old.points.length != points.length) return true;
+    for (int i = 0; i < points.length; i++) {
+      if (old.points[i] != points[i]) return true;
+    }
+    return false;
   }
 }

@@ -1,0 +1,648 @@
+{
+  "metadata": {
+    "floor": 2,
+    "title": "2nd Floor Corridor Graph (A* Auto-routing)",
+    "coordinate_space": {
+      "width": 1000,
+      "height": 1000,
+      "units": "px"
+    },
+    "notes": "Corridor U-shape around central void. Includes corridor nodes and room-door anchors."
+  },
+  "nodes": {
+    "NW": {
+      "x": 150,
+      "y": 150,
+      "type": "corridor"
+    },
+    "NE": {
+      "x": 850,
+      "y": 150,
+      "type": "corridor"
+    },
+    "SE": {
+      "x": 850,
+      "y": 700,
+      "type": "corridor"
+    },
+    "SW": {
+      "x": 150,
+      "y": 700,
+      "type": "corridor"
+    },
+    "N": {
+      "x": 500,
+      "y": 150,
+      "type": "corridor"
+    },
+    "S": {
+      "x": 500,
+      "y": 700,
+      "type": "corridor"
+    },
+    "W": {
+      "x": 150,
+      "y": 425,
+      "type": "corridor"
+    },
+    "E": {
+      "x": 850,
+      "y": 425,
+      "type": "corridor"
+    },
+    "W1": {
+      "x": 150,
+      "y": 250,
+      "type": "corridor"
+    },
+    "W2": {
+      "x": 150,
+      "y": 450,
+      "type": "corridor"
+    },
+    "W3": {
+      "x": 150,
+      "y": 650,
+      "type": "corridor"
+    },
+    "E1": {
+      "x": 850,
+      "y": 250,
+      "type": "corridor"
+    },
+    "E2": {
+      "x": 850,
+      "y": 450,
+      "type": "corridor"
+    },
+    "E3": {
+      "x": 850,
+      "y": 650,
+      "type": "corridor"
+    },
+    "d_SpeechLab": {
+      "x": 150,
+      "y": 180,
+      "type": "door",
+      "room": "Speech Lab L200"
+    },
+    "d_Storage": {
+      "x": 150,
+      "y": 220,
+      "type": "door",
+      "room": "Storage Room"
+    },
+    "d_CompLab5": {
+      "x": 150,
+      "y": 260,
+      "type": "door",
+      "room": "Computer Lab 5 L202"
+    },
+    "d_CiscoLab": {
+      "x": 150,
+      "y": 320,
+      "type": "door",
+      "room": "Cisco Lab L209"
+    },
+    "d_MissioWest": {
+      "x": 150,
+      "y": 380,
+      "type": "door",
+      "room": "Missio L201 (West)"
+    },
+    "d_ComfortRoom": {
+      "x": 150,
+      "y": 440,
+      "type": "door",
+      "room": "Comfort Room"
+    },
+    "d_MissioSouth": {
+      "x": 150,
+      "y": 780,
+      "type": "door",
+      "room": "Missio L201 (South)"
+    },
+    "d_CompLab4": {
+      "x": 150,
+      "y": 500,
+      "type": "door",
+      "room": "Computer Lab 4 L205"
+    },
+    "d_CompLab3": {
+      "x": 150,
+      "y": 560,
+      "type": "door",
+      "room": "Computer Lab 3 L203"
+    },
+    "d_PropComLab": {
+      "x": 150,
+      "y": 620,
+      "type": "door",
+      "room": "Proposed Com Lab L202"
+    },
+    "d_Faculty2": {
+      "x": 850,
+      "y": 180,
+      "type": "door",
+      "room": "Faculty Room 2 R209"
+    },
+    "d_R005": {
+      "x": 850,
+      "y": 220,
+      "type": "door",
+      "room": "R005"
+    },
+    "d_ContiEntRab": {
+      "x": 850,
+      "y": 280,
+      "type": "door",
+      "room": "Contient Rab R202"
+    },
+    "d_HardwareLab": {
+      "x": 850,
+      "y": 340,
+      "type": "door",
+      "room": "Hardware Lab R207"
+    },
+    "d_AccountingLab": {
+      "x": 850,
+      "y": 400,
+      "type": "door",
+      "room": "Accounting Lab R208"
+    },
+    "d_R202": {
+      "x": 850,
+      "y": 460,
+      "type": "door",
+      "room": "R202 Proposed Com Lab 9"
+    },
+    "d_R201a": {
+      "x": 850,
+      "y": 520,
+      "type": "door",
+      "room": "R201 Proposed Com Lab 1"
+    },
+    "d_R201b": {
+      "x": 850,
+      "y": 580,
+      "type": "door",
+      "room": "R201"
+    },
+    "d_TRC": {
+      "x": 850,
+      "y": 640,
+      "type": "door",
+      "room": "TRC R200"
+    },
+    "d_PsycheLab": {
+      "x": 850,
+      "y": 700,
+      "type": "door",
+      "room": "Psyche Lab R211"
+    }
+  },
+  "edges": [
+    {
+      "from": "NW",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NW",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NE",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E1",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E3",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SE",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SW",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W3",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W1",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W",
+      "to": "W2",
+      "cost": 25.0
+    },
+    {
+      "from": "W2",
+      "to": "W",
+      "cost": 25.0
+    },
+    {
+      "from": "E",
+      "to": "E2",
+      "cost": 25.0
+    },
+    {
+      "from": "E2",
+      "to": "E",
+      "cost": 25.0
+    },
+    {
+      "from": "W1",
+      "to": "W",
+      "cost": 175.0
+    },
+    {
+      "from": "W",
+      "to": "W1",
+      "cost": 175.0
+    },
+    {
+      "from": "W3",
+      "to": "W",
+      "cost": 225.0
+    },
+    {
+      "from": "W",
+      "to": "W3",
+      "cost": 225.0
+    },
+    {
+      "from": "E1",
+      "to": "E",
+      "cost": 175.0
+    },
+    {
+      "from": "E",
+      "to": "E1",
+      "cost": 175.0
+    },
+    {
+      "from": "E3",
+      "to": "E",
+      "cost": 225.0
+    },
+    {
+      "from": "E",
+      "to": "E3",
+      "cost": 225.0
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    },
+    {
+      "from": "d_SpeechLab",
+      "to": "W1",
+      "cost": 70.0
+    },
+    {
+      "from": "W1",
+      "to": "d_SpeechLab",
+      "cost": 70.0
+    },
+    {
+      "from": "d_Storage",
+      "to": "W1",
+      "cost": 30.0
+    },
+    {
+      "from": "W1",
+      "to": "d_Storage",
+      "cost": 30.0
+    },
+    {
+      "from": "d_CompLab5",
+      "to": "W2",
+      "cost": 190.0
+    },
+    {
+      "from": "W2",
+      "to": "d_CompLab5",
+      "cost": 190.0
+    },
+    {
+      "from": "d_CiscoLab",
+      "to": "W2",
+      "cost": 130.0
+    },
+    {
+      "from": "W2",
+      "to": "d_CiscoLab",
+      "cost": 130.0
+    },
+    {
+      "from": "d_MissioWest",
+      "to": "W2",
+      "cost": 70.0
+    },
+    {
+      "from": "W2",
+      "to": "d_MissioWest",
+      "cost": 70.0
+    },
+    {
+      "from": "d_ComfortRoom",
+      "to": "W2",
+      "cost": 10.0
+    },
+    {
+      "from": "W2",
+      "to": "d_ComfortRoom",
+      "cost": 10.0
+    },
+    {
+      "from": "d_MissioSouth",
+      "to": "SW",
+      "cost": 80.0
+    },
+    {
+      "from": "SW",
+      "to": "d_MissioSouth",
+      "cost": 80.0
+    },
+    {
+      "from": "d_CompLab4",
+      "to": "W3",
+      "cost": 150.0
+    },
+    {
+      "from": "W3",
+      "to": "d_CompLab4",
+      "cost": 150.0
+    },
+    {
+      "from": "d_CompLab3",
+      "to": "W3",
+      "cost": 90.0
+    },
+    {
+      "from": "W3",
+      "to": "d_CompLab3",
+      "cost": 90.0
+    },
+    {
+      "from": "d_PropComLab",
+      "to": "W3",
+      "cost": 30.0
+    },
+    {
+      "from": "W3",
+      "to": "d_PropComLab",
+      "cost": 30.0
+    },
+    {
+      "from": "d_Faculty2",
+      "to": "E1",
+      "cost": 70.0
+    },
+    {
+      "from": "E1",
+      "to": "d_Faculty2",
+      "cost": 70.0
+    },
+    {
+      "from": "d_R005",
+      "to": "E1",
+      "cost": 30.0
+    },
+    {
+      "from": "E1",
+      "to": "d_R005",
+      "cost": 30.0
+    },
+    {
+      "from": "d_ContiEntRab",
+      "to": "E2",
+      "cost": 170.0
+    },
+    {
+      "from": "E2",
+      "to": "d_ContiEntRab",
+      "cost": 170.0
+    },
+    {
+      "from": "d_HardwareLab",
+      "to": "E2",
+      "cost": 110.0
+    },
+    {
+      "from": "E2",
+      "to": "d_HardwareLab",
+      "cost": 110.0
+    },
+    {
+      "from": "d_AccountingLab",
+      "to": "E2",
+      "cost": 50.0
+    },
+    {
+      "from": "E2",
+      "to": "d_AccountingLab",
+      "cost": 50.0
+    },
+    {
+      "from": "d_R202",
+      "to": "E2",
+      "cost": 10.0
+    },
+    {
+      "from": "E2",
+      "to": "d_R202",
+      "cost": 10.0
+    },
+    {
+      "from": "d_R201a",
+      "to": "E3",
+      "cost": 130.0
+    },
+    {
+      "from": "E3",
+      "to": "d_R201a",
+      "cost": 130.0
+    },
+    {
+      "from": "d_R201b",
+      "to": "E3",
+      "cost": 70.0
+    },
+    {
+      "from": "E3",
+      "to": "d_R201b",
+      "cost": 70.0
+    },
+    {
+      "from": "d_TRC",
+      "to": "E3",
+      "cost": 10.0
+    },
+    {
+      "from": "E3",
+      "to": "d_TRC",
+      "cost": 10.0
+    },
+    {
+      "from": "d_PsycheLab",
+      "to": "SE",
+      "cost": 0.0
+    },
+    {
+      "from": "SE",
+      "to": "d_PsycheLab",
+      "cost": 0.0
+    }
+  ],
+  "rooms": {
+    "Speech Lab L200": "d_SpeechLab",
+    "Storage Room": "d_Storage",
+    "Computer Lab 5 L202": "d_CompLab5",
+    "Cisco Lab L209": "d_CiscoLab",
+    "Missio L201 (West)": "d_MissioWest",
+    "Comfort Room": "d_ComfortRoom",
+    "Missio L201 (South)": "d_MissioSouth",
+    "Computer Lab 4 L205": "d_CompLab4",
+    "Computer Lab 3 L203": "d_CompLab3",
+    "Proposed Com Lab L202": "d_PropComLab",
+    "Faculty Room 2 R209": "d_Faculty2",
+    "R005": "d_R005",
+    "Contient Rab R202": "d_ContiEntRab",
+    "Hardware Lab R207": "d_HardwareLab",
+    "Accounting Lab R208": "d_AccountingLab",
+    "R202 Proposed Com Lab 9": "d_R202",
+    "R201 Proposed Com Lab 1": "d_R201a",
+    "R201": "d_R201b",
+    "TRC R200": "d_TRC",
+    "Psyche Lab R211": "d_PsycheLab"
+  }
+}

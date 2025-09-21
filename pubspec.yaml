@@ -30,6 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  collection: ^1.17.2
   flutter_map: ^7.0.2           # OpenStreetMap (no API key required)
   latlong2: ^0.9.1
   provider: ^6.0.5

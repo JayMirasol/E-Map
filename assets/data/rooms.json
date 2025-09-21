@@ -76,26 +76,26 @@
 
   {"id":"R311_AVR","name":"R311 (AUDIO VISUAL ROOM)","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 
-  {"id":"MULTI_PURPOSE_HALL","name":"MULTI-PURPOSE HALL","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"MULTI_PURPOSE_HALL","name":"MULTI-PURPOSE HALL","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.489,"fy":0.528},
 
   {"id":"L401","name":"L401","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"L402","name":"L402","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
-  {"id":"L403","name":"L403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L403","name":"L403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.161,"fy":0.482},
   {"id":"L404","name":"L404","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"L405","name":"L405","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
-  {"id":"L406","name":"L406","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"L406","name":"L406","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.161,"fy":0.326},
   {"id":"L407","name":"L407","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"L408","name":"L408","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"L409","name":"L409","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 
   {"id":"COMFORT_ROOM_4F","name":"COMFORT ROOM","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
-  {"id":"MUSIC_ROOM","name":"MUSIC ROOM","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"MUSIC_ROOM","name":"MUSIC ROOM","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.826,"fy":0.694},
 
   {"id":"R401","name":"R401","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"R402","name":"R402","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
-  {"id":"R403","name":"R403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R403","name":"R403","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.824,"fy":0.498},
   {"id":"R404","name":"R404","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
-  {"id":"R405","name":"R405","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R405","name":"R405","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.829,"fy":0.334},
   {"id":"R406","name":"R406","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"R407","name":"R407","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"R408","name":"R408","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},

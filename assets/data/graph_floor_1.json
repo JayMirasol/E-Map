@@ -1,0 +1,733 @@
+{
+  "metadata": {
+    "floor": 1,
+    "title": "1st Floor Corridor Graph (A* Auto-routing)",
+    "coordinate_space": {
+      "width": 1000,
+      "height": 1000,
+      "units": "px"
+    },
+    "notes": "Corridor layout around central atrium. Includes corridor nodes and door anchors for labeled rooms."
+  },
+  "nodes": {
+    "NW": {
+      "x": 150,
+      "y": 150,
+      "type": "corridor"
+    },
+    "NE": {
+      "x": 850,
+      "y": 150,
+      "type": "corridor"
+    },
+    "SE": {
+      "x": 850,
+      "y": 700,
+      "type": "corridor"
+    },
+    "SW": {
+      "x": 150,
+      "y": 700,
+      "type": "corridor"
+    },
+    "N": {
+      "x": 500,
+      "y": 150,
+      "type": "corridor"
+    },
+    "S": {
+      "x": 500,
+      "y": 700,
+      "type": "corridor"
+    },
+    "W": {
+      "x": 150,
+      "y": 425,
+      "type": "corridor"
+    },
+    "E": {
+      "x": 850,
+      "y": 425,
+      "type": "corridor"
+    },
+    "W1": {
+      "x": 150,
+      "y": 250,
+      "type": "corridor"
+    },
+    "W2": {
+      "x": 150,
+      "y": 450,
+      "type": "corridor"
+    },
+    "W3": {
+      "x": 150,
+      "y": 650,
+      "type": "corridor"
+    },
+    "E1": {
+      "x": 850,
+      "y": 250,
+      "type": "corridor"
+    },
+    "E2": {
+      "x": 850,
+      "y": 450,
+      "type": "corridor"
+    },
+    "E3": {
+      "x": 850,
+      "y": 650,
+      "type": "corridor"
+    },
+    "d_OVPREQA": {
+      "x": 150,
+      "y": 180,
+      "type": "door",
+      "room": "OVPREQA"
+    },
+    "d_OVPA": {
+      "x": 150,
+      "y": 230,
+      "type": "door",
+      "room": "OVPA"
+    },
+    "d_CDSO": {
+      "x": 150,
+      "y": 280,
+      "type": "door",
+      "room": "CDSO"
+    },
+    "d_ARO": {
+      "x": 150,
+      "y": 330,
+      "type": "door",
+      "room": "ARO"
+    },
+    "d_Registrar": {
+      "x": 150,
+      "y": 370,
+      "type": "door",
+      "room": "Registrar"
+    },
+    "d_Academic1": {
+      "x": 150,
+      "y": 420,
+      "type": "door",
+      "room": "Academic Office 1"
+    },
+    "d_Academic2": {
+      "x": 150,
+      "y": 460,
+      "type": "door",
+      "room": "Academic Office 2"
+    },
+    "d_OVPAA": {
+      "x": 150,
+      "y": 500,
+      "type": "door",
+      "room": "OVPAA"
+    },
+    "d_HR": {
+      "x": 150,
+      "y": 540,
+      "type": "door",
+      "room": "HR"
+    },
+    "d_BFO": {
+      "x": 150,
+      "y": 580,
+      "type": "door",
+      "room": "BFO"
+    },
+    "d_BoardRoom": {
+      "x": 500,
+      "y": 200,
+      "type": "door",
+      "room": "Board Room"
+    },
+    "d_President": {
+      "x": 500,
+      "y": 250,
+      "type": "door",
+      "room": "President Office"
+    },
+    "d_CCC": {
+      "x": 500,
+      "y": 300,
+      "type": "door",
+      "room": "Center for Culture and Arts Office"
+    },
+    "d_Canteen": {
+      "x": 850,
+      "y": 180,
+      "type": "door",
+      "room": "Canteen"
+    },
+    "d_DanceStudio": {
+      "x": 850,
+      "y": 230,
+      "type": "door",
+      "room": "Dance Studio"
+    },
+    "d_APAG": {
+      "x": 850,
+      "y": 280,
+      "type": "door",
+      "room": "APAG"
+    },
+    "d_StepUp": {
+      "x": 850,
+      "y": 320,
+      "type": "door",
+      "room": "Step Up"
+    },
+    "d_ScienceLab": {
+      "x": 850,
+      "y": 370,
+      "type": "door",
+      "room": "Science Lab"
+    },
+    "d_Dispensing": {
+      "x": 850,
+      "y": 420,
+      "type": "door",
+      "room": "Dispensing Room"
+    },
+    "d_SASO": {
+      "x": 850,
+      "y": 470,
+      "type": "door",
+      "room": "SASO"
+    },
+    "d_CEO": {
+      "x": 850,
+      "y": 510,
+      "type": "door",
+      "room": "CEO"
+    },
+    "d_HotKitchen": {
+      "x": 850,
+      "y": 550,
+      "type": "door",
+      "room": "Hot Kitchen Lab"
+    },
+    "d_ColdKitchen": {
+      "x": 850,
+      "y": 600,
+      "type": "door",
+      "room": "Cold Kitchen Lab"
+    },
+    "d_CGFO": {
+      "x": 850,
+      "y": 650,
+      "type": "door",
+      "room": "CGFO"
+    },
+    "d_Clinic": {
+      "x": 850,
+      "y": 700,
+      "type": "door",
+      "room": "Clinic"
+    }
+  },
+  "edges": [
+    {
+      "from": "NW",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NW",
+      "cost": 350.0
+    },
+    {
+      "from": "N",
+      "to": "NE",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "N",
+      "cost": 350.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E1",
+      "cost": 200.0
+    },
+    {
+      "from": "E2",
+      "to": "E3",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "E2",
+      "cost": 200.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SE",
+      "cost": 350.0
+    },
+    {
+      "from": "S",
+      "to": "SW",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "S",
+      "cost": 350.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W3",
+      "cost": 200.0
+    },
+    {
+      "from": "W2",
+      "to": "W1",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "W2",
+      "cost": 200.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W",
+      "to": "W2",
+      "cost": 25.0
+    },
+    {
+      "from": "W2",
+      "to": "W",
+      "cost": 25.0
+    },
+    {
+      "from": "E",
+      "to": "E2",
+      "cost": 25.0
+    },
+    {
+      "from": "E2",
+      "to": "E",
+      "cost": 25.0
+    },
+    {
+      "from": "W1",
+      "to": "W",
+      "cost": 175.0
+    },
+    {
+      "from": "W",
+      "to": "W1",
+      "cost": 175.0
+    },
+    {
+      "from": "W3",
+      "to": "W",
+      "cost": 225.0
+    },
+    {
+      "from": "W",
+      "to": "W3",
+      "cost": 225.0
+    },
+    {
+      "from": "E1",
+      "to": "E",
+      "cost": 175.0
+    },
+    {
+      "from": "E",
+      "to": "E1",
+      "cost": 175.0
+    },
+    {
+      "from": "E3",
+      "to": "E",
+      "cost": 225.0
+    },
+    {
+      "from": "E",
+      "to": "E3",
+      "cost": 225.0
+    },
+    {
+      "from": "NW",
+      "to": "W1",
+      "cost": 100.0
+    },
+    {
+      "from": "W1",
+      "to": "NW",
+      "cost": 100.0
+    },
+    {
+      "from": "NE",
+      "to": "E1",
+      "cost": 100.0
+    },
+    {
+      "from": "E1",
+      "to": "NE",
+      "cost": 100.0
+    },
+    {
+      "from": "SW",
+      "to": "W3",
+      "cost": 50.0
+    },
+    {
+      "from": "W3",
+      "to": "SW",
+      "cost": 50.0
+    },
+    {
+      "from": "SE",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "E3",
+      "to": "SE",
+      "cost": 50.0
+    },
+    {
+      "from": "d_OVPREQA",
+      "to": "W1",
+      "cost": 70.0
+    },
+    {
+      "from": "W1",
+      "to": "d_OVPREQA",
+      "cost": 70.0
+    },
+    {
+      "from": "d_OVPA",
+      "to": "W1",
+      "cost": 20.0
+    },
+    {
+      "from": "W1",
+      "to": "d_OVPA",
+      "cost": 20.0
+    },
+    {
+      "from": "d_CDSO",
+      "to": "W1",
+      "cost": 30.0
+    },
+    {
+      "from": "W1",
+      "to": "d_CDSO",
+      "cost": 30.0
+    },
+    {
+      "from": "d_ARO",
+      "to": "W2",
+      "cost": 120.0
+    },
+    {
+      "from": "W2",
+      "to": "d_ARO",
+      "cost": 120.0
+    },
+    {
+      "from": "d_Registrar",
+      "to": "W2",
+      "cost": 80.0
+    },
+    {
+      "from": "W2",
+      "to": "d_Registrar",
+      "cost": 80.0
+    },
+    {
+      "from": "d_Academic1",
+      "to": "W2",
+      "cost": 30.0
+    },
+    {
+      "from": "W2",
+      "to": "d_Academic1",
+      "cost": 30.0
+    },
+    {
+      "from": "d_Academic2",
+      "to": "W2",
+      "cost": 10.0
+    },
+    {
+      "from": "W2",
+      "to": "d_Academic2",
+      "cost": 10.0
+    },
+    {
+      "from": "d_OVPAA",
+      "to": "W3",
+      "cost": 150.0
+    },
+    {
+      "from": "W3",
+      "to": "d_OVPAA",
+      "cost": 150.0
+    },
+    {
+      "from": "d_HR",
+      "to": "W3",
+      "cost": 110.0
+    },
+    {
+      "from": "W3",
+      "to": "d_HR",
+      "cost": 110.0
+    },
+    {
+      "from": "d_BFO",
+      "to": "SW",
+      "cost": 120.0
+    },
+    {
+      "from": "SW",
+      "to": "d_BFO",
+      "cost": 120.0
+    },
+    {
+      "from": "d_BoardRoom",
+      "to": "N",
+      "cost": 50.0
+    },
+    {
+      "from": "N",
+      "to": "d_BoardRoom",
+      "cost": 50.0
+    },
+    {
+      "from": "d_President",
+      "to": "N",
+      "cost": 100.0
+    },
+    {
+      "from": "N",
+      "to": "d_President",
+      "cost": 100.0
+    },
+    {
+      "from": "d_CCC",
+      "to": "S",
+      "cost": 400.0
+    },
+    {
+      "from": "S",
+      "to": "d_CCC",
+      "cost": 400.0
+    },
+    {
+      "from": "d_Canteen",
+      "to": "E1",
+      "cost": 70.0
+    },
+    {
+      "from": "E1",
+      "to": "d_Canteen",
+      "cost": 70.0
+    },
+    {
+      "from": "d_DanceStudio",
+      "to": "E1",
+      "cost": 20.0
+    },
+    {
+      "from": "E1",
+      "to": "d_DanceStudio",
+      "cost": 20.0
+    },
+    {
+      "from": "d_APAG",
+      "to": "E1",
+      "cost": 30.0
+    },
+    {
+      "from": "E1",
+      "to": "d_APAG",
+      "cost": 30.0
+    },
+    {
+      "from": "d_StepUp",
+      "to": "E2",
+      "cost": 130.0
+    },
+    {
+      "from": "E2",
+      "to": "d_StepUp",
+      "cost": 130.0
+    },
+    {
+      "from": "d_ScienceLab",
+      "to": "E2",
+      "cost": 80.0
+    },
+    {
+      "from": "E2",
+      "to": "d_ScienceLab",
+      "cost": 80.0
+    },
+    {
+      "from": "d_Dispensing",
+      "to": "E2",
+      "cost": 30.0
+    },
+    {
+      "from": "E2",
+      "to": "d_Dispensing",
+      "cost": 30.0
+    },
+    {
+      "from": "d_SASO",
+      "to": "E2",
+      "cost": 20.0
+    },
+    {
+      "from": "E2",
+      "to": "d_SASO",
+      "cost": 20.0
+    },
+    {
+      "from": "d_CEO",
+      "to": "E2",
+      "cost": 60.0
+    },
+    {
+      "from": "E2",
+      "to": "d_CEO",
+      "cost": 60.0
+    },
+    {
+      "from": "d_HotKitchen",
+      "to": "E3",
+      "cost": 100.0
+    },
+    {
+      "from": "E3",
+      "to": "d_HotKitchen",
+      "cost": 100.0
+    },
+    {
+      "from": "d_ColdKitchen",
+      "to": "E3",
+      "cost": 50.0
+    },
+    {
+      "from": "E3",
+      "to": "d_ColdKitchen",
+      "cost": 50.0
+    },
+    {
+      "from": "d_CGFO",
+      "to": "E3",
+      "cost": 0.0
+    },
+    {
+      "from": "E3",
+      "to": "d_CGFO",
+      "cost": 0.0
+    },
+    {
+      "from": "d_Clinic",
+      "to": "SE",
+      "cost": 0.0
+    },
+    {
+      "from": "SE",
+      "to": "d_Clinic",
+      "cost": 0.0
+    }
+  ],
+  "rooms": {
+    "OVPREQA": "d_OVPREQA",
+    "OVPA": "d_OVPA",
+    "CDSO": "d_CDSO",
+    "ARO": "d_ARO",
+    "Registrar": "d_Registrar",
+    "Academic Office 1": "d_Academic1",
+    "Academic Office 2": "d_Academic2",
+    "OVPAA": "d_OVPAA",
+    "HR": "d_HR",
+    "BFO": "d_BFO",
+    "Board Room": "d_BoardRoom",
+    "President Office": "d_President",
+    "Center for Culture and Arts Office": "d_CCC",
+    "Canteen": "d_Canteen",
+    "Dance Studio": "d_DanceStudio",
+    "APAG": "d_APAG",
+    "Step Up": "d_StepUp",
+    "Science Lab": "d_ScienceLab",
+    "Dispensing Room": "d_Dispensing",
+    "SASO": "d_SASO",
+    "CEO": "d_CEO",
+    "Hot Kitchen Lab": "d_HotKitchen",
+    "Cold Kitchen Lab": "d_ColdKitchen",
+    "CGFO": "d_CGFO",
+    "Clinic": "d_Clinic"
+  }
+}
