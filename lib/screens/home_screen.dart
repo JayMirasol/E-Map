@@ -13,7 +13,7 @@ class HomeScreen extends StatelessWidget {
       _HomeTile('Faculty Rooms', Icons.meeting_room, AppRoutes.faculty),
       _HomeTile('Laboratory Rooms', Icons.computer, AppRoutes.labs),
       _HomeTile('Floorplan', Icons.layers, AppRoutes.floorplan),
-      _HomeTile('Admin', Icons.admin_panel_settings, AppRoutes.admin),
+      // _HomeTile('Admin', Icons.admin_panel_settings, AppRoutes.admin),
     ];
 
     return Scaffold(

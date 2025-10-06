@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
 import '../models/room.dart';
 import '../widgets/room_search.dart';
-import '../models/floor_graph.dart';
-import '../core/pathfinding.dart';
 
 class FloorplanScreen extends StatelessWidget {
   const FloorplanScreen({super.key});
@@ -109,30 +107,30 @@ class _FloorCanvasState extends State<_FloorCanvas> {
   }
 
   // Optional helper: add a waypoint at a chosen room center (via search)
-  Future<void> _addWaypointFromRoom() async {
-    final selected = await showSearch<Room?>(
-      context: context,
-      delegate: RoomSearchDelegate(source: widget.rooms),
-    );
-    if (selected != null && selected.fx != null && selected.fy != null) {
-      final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
-      if (box == null) return;
-      final size = box.size;
-      setState(() {
-        _waypoints.add(
-          Offset(selected.fx! * size.width, selected.fy! * size.height),
-        );
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This room has no fx/fy yet. Long-press to capture coordinates.',
-          ),
-        ),
-      );
-    }
-  }
+  // Future<void> _addWaypointFromRoom() async {
+  //   final selected = await showSearch<Room?>(
+  //     context: context,
+  //     delegate: RoomSearchDelegate(source: widget.rooms),
+  //   );
+  //   if (selected != null && selected.fx != null && selected.fy != null) {
+  //     final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+  //     if (box == null) return;
+  //     final size = box.size;
+  //     setState(() {
+  //       _waypoints.add(
+  //         Offset(selected.fx! * size.width, selected.fy! * size.height),
+  //       );
+  //     });
+  //   } else {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text(
+  //           'This room has no fx/fy yet. Long-press to capture coordinates.',
+  //         ),
+  //       ),
+  //     );
+  //   }
+  // }
 
   void _clearPath() {
     setState(() {
@@ -336,7 +334,7 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       onPressed: _chooseStart,
                       child: Text(
                         _startRoom == null
-                            ? 'Choose Start'
+                            ? 'Start'
                             : 'Start: ${_startRoom!.name}',
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -354,7 +352,7 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       onPressed: _startRoom == null ? null : _chooseDest,
                       child: Text(
                         _endRoom == null
-                            ? 'Choose Destination'
+                            ? 'Destination'
                             : 'Dest: ${_endRoom!.name}',
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -398,27 +396,27 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  // const SizedBox(width: 8),
 
-                  // (Optional) Add waypoint from a room center, via search
-                  SizedBox(
-                    width: 56,
-                    height: 48,
-                    child: Tooltip(
-                      message: 'Add waypoint from room',
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.shade200,
-                          foregroundColor: Colors.black87,
-                          padding: EdgeInsets.zero,
-                        ),
-                        onPressed: _startRoom == null
-                            ? null
-                            : _addWaypointFromRoom,
-                        child: const Icon(Icons.add_location_alt),
-                      ),
-                    ),
-                  ),
+                  // // (Optional) Add waypoint from a room center, via search
+                  // SizedBox(
+                  //   width: 56,
+                  //   height: 48,
+                  //   child: Tooltip(
+                  //     message: 'Add waypoint from room',
+                  //     child: ElevatedButton(
+                  //       style: ElevatedButton.styleFrom(
+                  //         backgroundColor: Colors.grey.shade200,
+                  //         foregroundColor: Colors.black87,
+                  //         padding: EdgeInsets.zero,
+                  //       ),
+                  //       onPressed: _startRoom == null
+                  //           ? null
+                  //           : _addWaypointFromRoom,
+                  //       child: const Icon(Icons.add_location_alt),
+                  //     ),
+                  //   ),
+                  // ),
                   const SizedBox(width: 8),
 
                   // Clear Path
@@ -468,7 +466,7 @@ class _PolylinePainter extends CustomPainter {
     }
 
     final paint = Paint()
-      ..color = Colors.deepPurple
+      ..color = Colors.green
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round

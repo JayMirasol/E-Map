@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -14,12 +15,9 @@ class SchedulesScreen extends StatefulWidget {
 
 class _SchedulesScreenState extends State<SchedulesScreen> {
   final TextEditingController _searchCtr = TextEditingController();
-  String? _selectedDay; // "Sun" | "Mon" | ... or null
   TimeOfDay? _fromTime;
   TimeOfDay? _toTime;
   bool _showFilters = true;
-
-  final _days = const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   @override
   void dispose() {
@@ -38,6 +36,11 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
         // 1) Apply filters to schedules
         final filtered = _applyFilters(provider.schedules);
 
+        // Build unique instructor list for icons (preserve sort by name)
+        final instructors =
+            provider.schedules.map((s) => s.instructor).toSet().toList()
+              ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
         return Scaffold(
           appBar: AppBar(
             title: const Text('Instructor Schedules'),
@@ -54,6 +57,40 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
           body: Column(
             children: [
               if (_showFilters) _buildFilters(context),
+              // Professor icons row (flexible to avoid overflow)
+              SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    8,
+                    12,
+                    MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  child: SizedBox(
+                    height: 100,
+                    child: instructors.isEmpty
+                        ? const Center(child: Text('No instructors available.'))
+                        : ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: instructors.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 10),
+                            itemBuilder: (_, i) {
+                              final name = instructors[i];
+                              return _buildInstructorTile(
+                                context,
+                                name,
+                                provider,
+                              );
+                            },
+                          ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              // Main schedule list (filtered)
               Expanded(
                 child: filtered.isEmpty
                     ? const Center(
@@ -68,16 +105,18 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                           final roomName = room?.name ?? s.roomId;
 
                           return ListTile(
-                            leading: const Icon(Icons.schedule),
+                            leading: _profCircleWithPhoto(
+                              s.instructor,
+                              provider,
+                              radius: 18,
+                            ),
                             title: Text('${s.instructor} — ${s.subject}'),
                             subtitle: Text(
-                              '${s.day} • ${fmt.format(s.start)}–${fmt.format(s.end)} • Room: $roomName',
+                              '${fmt.format(s.start)}–${fmt.format(s.end)} • Room: $roomName',
                             ),
                             trailing: const Icon(Icons.map),
                             onTap: () {
-                              if (room != null) {
-                                provider.selectRoom(room.id);
-                              }
+                              if (room != null) provider.selectRoom(room.id);
                               Navigator.pushNamed(context, AppRoutes.map);
                             },
                           );
@@ -85,6 +124,191 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                       ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --------------- Instructor tile and bottom sheet ----------------
+
+  Widget _buildInstructorTile(
+    BuildContext context,
+    String instructor,
+    CampusProvider provider,
+  ) {
+    final availableNow = provider.instructorAvailableNow(instructor);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => _showInstructorSchedules(context, instructor, provider),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _profCircleWithPhoto(instructor, provider, radius: 30),
+              if (availableNow)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 72,
+          child: Text(
+            _shortName(instructor),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showInstructorSchedules(
+    BuildContext context,
+    String instructor,
+    CampusProvider provider,
+  ) {
+    final fmt = DateFormat('h:mm a');
+
+    List<Schedule> schedules = provider.schedulesForInstructor(instructor);
+    schedules = _applyFiltersToList(schedules);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    _profCircleWithPhoto(instructor, provider, radius: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        instructor,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    // Full screen detail push
+                    IconButton(
+                      tooltip: 'Open profile',
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InstructorDetailScreen(
+                              instructor: instructor,
+                              provider: provider,
+                            ),
+                            fullscreenDialog: true,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.open_in_full),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (schedules.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text('No schedules available for this instructor.'),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: schedules.length,
+                      separatorBuilder: (_, __) => const Divider(),
+                      itemBuilder: (_, i) {
+                        final s = schedules[i];
+                        final room = provider.roomById(s.roomId);
+                        final roomName = room?.name ?? s.roomId;
+                        final roomThumb = provider.roomThumbnail(s.roomId);
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: roomThumb != null
+                              ? SizedBox(
+                                  width: 56,
+                                  height: 56,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: roomThumb.startsWith('assets/')
+                                        ? Image.asset(
+                                            roomThumb,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.meeting_room),
+                                          )
+                                        : Image.network(
+                                            roomThumb,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.meeting_room),
+                                          ),
+                                  ),
+                                )
+                              : const SizedBox(
+                                  width: 56,
+                                  child: Icon(Icons.meeting_room),
+                                ),
+                          title: Text(s.subject),
+                          subtitle: Text(
+                            '${fmt.format(s.start)}–${fmt.format(s.end)}',
+                          ),
+                          trailing: TextButton.icon(
+                            icon: const Icon(Icons.place),
+                            label: Text(
+                              roomName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () {
+                              if (room != null) provider.selectRoom(room.id);
+                              Navigator.of(ctx).pop(); // close sheet
+                              Navigator.pushNamed(context, AppRoutes.map);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -101,7 +325,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Column(
           children: [
-            // Search (instructor or subject)
             TextField(
               controller: _searchCtr,
               onChanged: (_) => setState(() {}),
@@ -123,34 +346,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // Day chips
-            SizedBox(
-              height: 38,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _days.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  if (i == 0) {
-                    return FilterChip(
-                      label: const Text('All Days'),
-                      selected: _selectedDay == null,
-                      onSelected: (_) => setState(() => _selectedDay = null),
-                    );
-                  }
-                  final day = _days[i - 1];
-                  return FilterChip(
-                    label: Text(day),
-                    selected: _selectedDay == day,
-                    onSelected: (_) => setState(() => _selectedDay = day),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Time range pickers
             Row(
               children: [
                 Expanded(
@@ -200,8 +395,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
               ],
             ),
             const SizedBox(height: 8),
-
-            // Clear all button
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -209,7 +402,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                 label: const Text('Clear all filters'),
                 onPressed: () => setState(() {
                   _searchCtr.clear();
-                  _selectedDay = null;
                   _fromTime = null;
                   _toTime = null;
                 }),
@@ -226,7 +418,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   List<Schedule> _applyFilters(List<Schedule> source) {
     Iterable<Schedule> out = source;
 
-    // Search over instructor OR subject
     final q = _searchCtr.text.trim().toLowerCase();
     if (q.isNotEmpty) {
       out = out.where(
@@ -236,14 +427,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
       );
     }
 
-    // Day filter
-    if (_selectedDay != null) {
-      out = out.where(
-        (s) => s.day.toLowerCase().startsWith(_selectedDay!.toLowerCase()),
-      );
-    }
-
-    // Time window filter — match if any overlap with chosen window
     if (_fromTime != null || _toTime != null) {
       out = out.where((s) {
         final sStartToD = TimeOfDay(hour: s.start.hour, minute: s.start.minute);
@@ -257,21 +440,25 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
         final wStartMin = _toMinutes(winStart);
         final wEndMin = _toMinutes(winEnd);
 
-        // overlap if schedule start < window end AND schedule end > window start
         final overlaps = sStartMin < wEndMin && sEndMin > wStartMin;
         return overlaps;
       });
     }
 
-    // Sort by day then start time (optional)
     out = out.toList()
       ..sort((a, b) {
-        final d = _dayOrder(a.day).compareTo(_dayOrder(b.day));
+        final d = a.instructor.toLowerCase().compareTo(
+          b.instructor.toLowerCase(),
+        );
         if (d != 0) return d;
         return a.start.compareTo(b.start);
       });
 
     return out.toList();
+  }
+
+  List<Schedule> _applyFiltersToList(List<Schedule> source) {
+    return _applyFilters(source);
   }
 
   int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
@@ -280,25 +467,165 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
     return DateFormat('h:mm a').format(dt);
   }
 
-  int _dayOrder(String d) {
-    final norm = (d.length >= 3 ? d.substring(0, 3) : d).toLowerCase();
-    switch (norm) {
-      case 'sun':
-        return 0;
-      case 'mon':
-        return 1;
-      case 'tue':
-        return 2;
-      case 'wed':
-        return 3;
-      case 'thu':
-        return 4;
-      case 'fri':
-        return 5;
-      case 'sat':
-        return 6;
-      default:
-        return 7;
+  // ---------------- Helpers for professor avatars ----------------
+
+  Widget _profCircleWithPhoto(
+    String instructor,
+    CampusProvider provider, {
+    double radius = 18,
+  }) {
+    final photoUrl = provider.photoForInstructor(instructor);
+    if (photoUrl == null || photoUrl.trim().isEmpty) {
+      return CircleAvatar(radius: radius, child: _profInitials(instructor));
     }
+
+    final isAsset = photoUrl.startsWith('assets/');
+    final ImageProvider imageProvider = isAsset
+        ? AssetImage(photoUrl)
+        : NetworkImage(photoUrl);
+
+    // Use CircleAvatar.backgroundImage which fills the circle reliably.
+    // Note: backgroundImage doesn't offer an errorBuilder, so we still fallback to initials
+    // if we detect asset not found (via debug mode check). For simplicity we attempt to use
+    // backgroundImage and if you still see initials, it's very likely the image file itself
+    // has small/transparent content.
+    try {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: imageProvider,
+        backgroundColor: Colors.grey.shade200,
+        // provide a semantic label so screen readers get context
+        foregroundImage: null,
+      );
+    } catch (_) {
+      // fallback
+      return CircleAvatar(radius: radius, child: _profInitials(instructor));
+    }
+  }
+
+  Widget _profInitials(String name) {
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    String initials;
+    if (parts.isEmpty) {
+      initials = '?';
+    } else if (parts.length == 1) {
+      initials = parts[0].substring(0, 1).toUpperCase();
+    } else {
+      initials = (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return Text(initials, style: const TextStyle(fontWeight: FontWeight.bold));
+  }
+
+  String _shortName(String name) {
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.length >= 2) return '${parts[0]} ${parts[1]}';
+    return name;
+  }
+}
+
+// ---------------- A simple full-screen instructor detail page ----------------
+
+class InstructorDetailScreen extends StatelessWidget {
+  final String instructor;
+  final CampusProvider provider;
+  const InstructorDetailScreen({
+    required this.instructor,
+    required this.provider,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final schedules = provider.schedulesForInstructor(instructor)
+      ..sort((a, b) => a.start.compareTo(b.start));
+    final fmt = DateFormat('h:mm a');
+    final photoUrl = provider.photoForInstructor(instructor);
+
+    final ImageProvider? imgProvider = (photoUrl != null && photoUrl.isNotEmpty)
+        ? (photoUrl.startsWith('assets/')
+              ? AssetImage(photoUrl)
+              : NetworkImage(photoUrl))
+        : null;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(instructor)),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            if (imgProvider != null)
+              CircleAvatar(
+                radius: 44,
+                backgroundImage: imgProvider,
+                backgroundColor: Colors.grey.shade200,
+              )
+            else
+              CircleAvatar(
+                radius: 44,
+                child: Text(instructor.substring(0, 1).toUpperCase()),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              instructor,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: schedules.isEmpty
+                  ? const Center(child: Text('No schedules'))
+                  : ListView.separated(
+                      itemCount: schedules.length,
+                      separatorBuilder: (_, __) => const Divider(),
+                      itemBuilder: (_, i) {
+                        final s = schedules[i];
+                        final room = provider.roomById(s.roomId);
+                        final roomName = room?.name ?? s.roomId;
+                        final roomThumb = provider.roomThumbnail(s.roomId);
+                        return ListTile(
+                          leading: roomThumb != null
+                              ? SizedBox(
+                                  width: 64,
+                                  height: 64,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: roomThumb.startsWith('assets/')
+                                        ? Image.asset(
+                                            roomThumb,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.meeting_room),
+                                          )
+                                        : Image.network(
+                                            roomThumb,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.meeting_room),
+                                          ),
+                                  ),
+                                )
+                              : const Icon(Icons.meeting_room),
+                          title: Text(s.subject),
+                          subtitle: Text(
+                            '${fmt.format(s.start)} – ${fmt.format(s.end)}\nRoom: $roomName',
+                          ),
+                          isThreeLine: true,
+                          onTap: () {
+                            if (room != null) provider.selectRoom(room.id);
+                            Navigator.pushNamed(context, AppRoutes.map);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

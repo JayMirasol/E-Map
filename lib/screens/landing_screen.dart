@@ -48,12 +48,12 @@ class LandingScreen extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.black.withOpacity(0.7),
-                          fontSize: 14,
+                          fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
 
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 56),
 
                       // Buttons
                       SizedBox(
@@ -64,20 +64,45 @@ class LandingScreen extends StatelessWidget {
                           onPressed: () =>
                               Navigator.pushNamed(context, AppRoutes.home),
                           style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
+                        child: FilledButton.icon(
                           icon: const Icon(Icons.info_outline),
                           label: const Text('About'),
                           onPressed: () =>
                               Navigator.pushNamed(context, AppRoutes.about),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      Text(
+                        'Authorized only. If not, kindly disregard',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.blueGrey.withOpacity(0.7),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const SizedBox(height: 5),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.info_outline),
+                          label: const Text('Administrator'),
+                          onPressed: () =>
+                              Navigator.pushNamed(context, AppRoutes.admin),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                           ),
                         ),
                       ),
