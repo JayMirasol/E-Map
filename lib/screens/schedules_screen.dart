@@ -1,5 +1,8 @@
+// lib/screens/schedules_screen.dart
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
@@ -19,17 +22,75 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   TimeOfDay? _toTime;
   bool _showFilters = true;
 
+  // init future so FutureBuilder doesn't restart repeatedly
+  Future<void>? _initFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initFuture ??= _loadAndPrecache(context);
+  }
+
   @override
   void dispose() {
     _searchCtr.dispose();
     super.dispose();
   }
 
+  /// 1) load provider data
+  /// 2) precache all instructor images referenced in provider.instructorPhotos
+  Future<void> _loadAndPrecache(BuildContext ctx) async {
+    final provider = ctx.read<CampusProvider>();
+    await provider.load();
+
+    // collect distinct photo URLs that look like assets or http
+    final urls = provider.instructorPhotos.values
+        .toSet()
+        .whereType<String>()
+        .toList();
+
+    for (final url in urls) {
+      try {
+        if (url.startsWith('assets/')) {
+          // Attempt to load asset bytes; if successful, precache a MemoryImage
+          final bd = await rootBundle.load(url);
+          final bytes = bd.buffer.asUint8List();
+          if (bytes.isNotEmpty) {
+            await precacheImage(MemoryImage(bytes), ctx);
+            if (kDebugMode) debugPrint('Precached asset image: $url');
+          } else {
+            if (kDebugMode) debugPrint('Asset had empty bytes: $url');
+          }
+        } else if (url.startsWith('http')) {
+          final prov = NetworkImage(url);
+          await precacheImage(prov, ctx);
+          if (kDebugMode) debugPrint('Precached network image: $url');
+        } else {
+          // fallback: try to load as asset path anyway
+          final bd = await rootBundle.load(url);
+          final bytes = bd.buffer.asUint8List();
+          if (bytes.isNotEmpty) await precacheImage(MemoryImage(bytes), ctx);
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('Precache failed for $url => $e');
+        // keep going — fallback to initials will be used for this instructor
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: context.read<CampusProvider>().load(),
-      builder: (_, __) {
+      future: _initFuture,
+      builder: (_, snapshot) {
+        // while still loading provider & precache show a small progress
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Instructor Schedules')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
         final provider = context.watch<CampusProvider>();
         final fmt = DateFormat('h:mm a');
 
@@ -217,7 +278,6 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                         ),
                       ),
                     ),
-                    // Full screen detail push
                     IconButton(
                       tooltip: 'Open profile',
                       onPressed: () {
@@ -479,26 +539,24 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
       return CircleAvatar(radius: radius, child: _profInitials(instructor));
     }
 
-    final isAsset = photoUrl.startsWith('assets/');
-    final ImageProvider imageProvider = isAsset
-        ? AssetImage(photoUrl)
-        : NetworkImage(photoUrl);
-
-    // Use CircleAvatar.backgroundImage which fills the circle reliably.
-    // Note: backgroundImage doesn't offer an errorBuilder, so we still fallback to initials
-    // if we detect asset not found (via debug mode check). For simplicity we attempt to use
-    // backgroundImage and if you still see initials, it's very likely the image file itself
-    // has small/transparent content.
+    // If we already precached a MemoryImage earlier, backgroundImage will be ready.
+    // Prefer MemoryImage for assets (ensures exact bytes are used) and NetworkImage for http.
     try {
+      final ImageProvider prov;
+      if (photoUrl.startsWith('assets/')) {
+        // Attempt AssetImage first — in many cases it's fine because we precached already.
+        prov = AssetImage(photoUrl);
+      } else if (photoUrl.startsWith('http')) {
+        prov = NetworkImage(photoUrl);
+      } else {
+        prov = AssetImage(photoUrl);
+      }
       return CircleAvatar(
         radius: radius,
-        backgroundImage: imageProvider,
+        backgroundImage: prov,
         backgroundColor: Colors.grey.shade200,
-        // provide a semantic label so screen readers get context
-        foregroundImage: null,
       );
     } catch (_) {
-      // fallback
       return CircleAvatar(radius: radius, child: _profInitials(instructor));
     }
   }

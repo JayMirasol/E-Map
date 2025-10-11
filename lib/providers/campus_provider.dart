@@ -1,3 +1,4 @@
+// lib/providers/campus_provider.dart
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,7 @@ class CampusProvider with ChangeNotifier {
   String? _selectedRoomId;
 
   // NEW: map of instructor -> photo URL (populated from assets or remote source)
+  // This is public for quick debug inspection if needed.
   final Map<String, String> instructorPhotos = {};
 
   List<Room> get rooms => _rooms;
@@ -27,14 +29,22 @@ class CampusProvider with ChangeNotifier {
   Future<void> load() async {
     // Rooms still from assets for now
     if (_rooms.isEmpty) {
-      final roomsStr = await rootBundle.loadString('assets/data/rooms.json');
-      _rooms = (jsonDecode(roomsStr) as List)
-          .map((e) => Room.fromJson(e))
-          .toList();
+      try {
+        final roomsStr = await rootBundle.loadString('assets/data/rooms.json');
+        _rooms = (jsonDecode(roomsStr) as List)
+            .map((e) => Room.fromJson(e))
+            .toList();
+      } catch (e, st) {
+        if (kDebugMode) {
+          debugPrint('Failed to load rooms.json: $e\n$st');
+        }
+        _rooms = [];
+      }
     }
 
     // Optionally load instructor photos if you store them in assets/data/instructor_photos.json
     // Example JSON shape: { "John Doe": "https://...", "Jane Smith": "assets/images/jane.jpg" }
+    instructorPhotos.clear();
     try {
       final photosStr = await rootBundle.loadString(
         'assets/data/instructor_photos.json',
@@ -42,15 +52,38 @@ class CampusProvider with ChangeNotifier {
       final Map<String, dynamic> pmap =
           jsonDecode(photosStr) as Map<String, dynamic>;
       pmap.forEach((k, v) {
-        if (v is String && v.isNotEmpty) instructorPhotos[k] = v;
+        if (v is String && v.isNotEmpty) instructorPhotos[k.trim()] = v.trim();
       });
-    } catch (_) {
+
+      if (kDebugMode) {
+        debugPrint(
+          'Loaded instructor_photos.json with ${instructorPhotos.length} entries.',
+        );
+        for (final e in instructorPhotos.entries) {
+          debugPrint('  photo: "${e.key}" -> "${e.value}"');
+        }
+      }
+    } catch (e, st) {
       // file missing is ok — thumbnails will fall back to initials
+      if (kDebugMode) {
+        debugPrint(
+          'No instructor_photos.json loaded (or failed to parse): $e\n$st',
+        );
+      }
+      instructorPhotos.clear();
     }
 
     // Schedules from local document storage (seeded from assets on first run)
-    final rows = await LocalStore.readSchedules();
-    _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
+    try {
+      final rows = await LocalStore.readSchedules();
+      _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('Failed to read schedules from LocalStore: $e\n$st');
+      }
+      _schedules = [];
+    }
+
     notifyListeners();
     await _loadGraphs();
   }
@@ -129,11 +162,69 @@ class CampusProvider with ChangeNotifier {
 
   // --------------- NEW: instructor helpers ----------------
 
-  /// Returns photo URL for instructor or null.
-  /// Look up in `instructorPhotos` map. You can populate instructorPhotos from
-  /// assets, remote API, or during admin edits.
+  /// Robust lookup for instructor photos.
+  /// Tries exact match -> case-insensitive -> strip common prefixes -> last-name -> initials.
   String? photoForInstructor(String instructor) {
-    return instructorPhotos[instructor];
+    if (instructor.trim().isEmpty) return null;
+
+    final key = instructor.trim();
+
+    // 1) exact match
+    if (instructorPhotos.containsKey(key)) return instructorPhotos[key];
+
+    // 2) case-insensitive exact
+    final ciExact = instructorPhotos.entries.firstWhere(
+      (e) => e.key.toLowerCase() == key.toLowerCase(),
+      orElse: () => const MapEntry('', ''),
+    );
+    if (ciExact.key.isNotEmpty) return ciExact.value;
+
+    // 3) strip common prefixes like "Prof.", "Dr.", "Mr.", "Ms.", "Eng."
+    final stripped = key
+        .replaceAll(
+          RegExp(
+            r'^(Prof\.?|Dr\.?|Mr\.?|Ms\.?|Eng\.?)\s*',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
+    if (instructorPhotos.containsKey(stripped))
+      return instructorPhotos[stripped];
+    final ciStripped = instructorPhotos.entries.firstWhere(
+      (e) => e.key.toLowerCase() == stripped.toLowerCase(),
+      orElse: () => const MapEntry('', ''),
+    );
+    if (ciStripped.key.isNotEmpty) return ciStripped.value;
+
+    // 4) try last-name match (if instructor has at least one space)
+    final parts = stripped
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.length >= 1) {
+      final last = parts.last;
+      final lastMatch = instructorPhotos.entries.firstWhere(
+        (e) => e.key.toLowerCase().contains(last.toLowerCase()),
+        orElse: () => const MapEntry('', ''),
+      );
+      if (lastMatch.key.isNotEmpty) return lastMatch.value;
+    }
+
+    // 5) try initials match (e.g., "JM" or "J M")
+    final initials = parts.isNotEmpty
+        ? parts.map((p) => p[0]).take(3).join().toUpperCase()
+        : '';
+    if (initials.isNotEmpty) {
+      final initMatch = instructorPhotos.entries.firstWhere(
+        (e) => e.key.replaceAll(RegExp(r'\s+'), '').toUpperCase() == initials,
+        orElse: () => const MapEntry('', ''),
+      );
+      if (initMatch.key.isNotEmpty) return initMatch.value;
+    }
+
+    // nothing found
+    return null;
   }
 
   /// Returns true if instructor has a schedule AND that schedule includes current time
