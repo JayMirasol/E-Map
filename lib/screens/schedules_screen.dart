@@ -1,5 +1,4 @@
 // lib/screens/schedules_screen.dart
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -151,37 +150,56 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                 ),
               ),
               const Divider(height: 1),
-              // Main schedule list (filtered)
+              // Main schedule list grouped by day
               Expanded(
                 child: filtered.isEmpty
                     ? const Center(
                         child: Text('No schedules match your filters.'),
                       )
-                    : ListView.separated(
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          final s = filtered[i];
-                          final room = provider.roomById(s.roomId);
-                          final roomName = room?.name ?? s.roomId;
-
-                          return ListTile(
-                            leading: _profCircleWithPhoto(
-                              s.instructor,
-                              provider,
-                              radius: 18,
-                            ),
-                            title: Text('${s.instructor} — ${s.subject}'),
-                            subtitle: Text(
-                              '${fmt.format(s.start)}–${fmt.format(s.end)} • Room: $roomName',
-                            ),
-                            trailing: const Icon(Icons.map),
-                            onTap: () {
-                              if (room != null) provider.selectRoom(room.id);
-                              Navigator.pushNamed(context, AppRoutes.map);
-                            },
+                    : ListView(
+                        // Sort by canonical day order using CampusProvider.days
+                        children: CampusProvider.days.map((day) {
+                          final daySchedules =
+                              filtered.where((s) => s.day == day).toList()
+                                ..sort((a, b) => a.start.compareTo(b.start));
+                          if (daySchedules.isEmpty) return const SizedBox();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  day,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              ...daySchedules.map((s) {
+                                final room = provider.roomById(s.roomId);
+                                final roomName = room?.name ?? s.roomId;
+                                return ListTile(
+                                  leading: _profCircleWithPhoto(
+                                    s.instructor,
+                                    provider,
+                                    radius: 18,
+                                  ),
+                                  title: Text('${s.instructor} — ${s.subject}'),
+                                  subtitle: Text(
+                                    '${fmt.format(s.start)}–${fmt.format(s.end)} • Room: $roomName',
+                                  ),
+                                  trailing: const Icon(Icons.map),
+                                  onTap: () {
+                                    if (room != null)
+                                      provider.selectRoom(room.id);
+                                    Navigator.pushNamed(context, AppRoutes.map);
+                                  },
+                                );
+                              }).toList(),
+                            ],
                           );
-                        },
+                        }).toList(),
                       ),
               ),
             ],
@@ -253,6 +271,14 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
 
     List<Schedule> schedules = provider.schedulesForInstructor(instructor);
     schedules = _applyFiltersToList(schedules);
+
+    // Sort schedules by day order, then by start time
+    schedules.sort((a, b) {
+      final dayA = CampusProvider.days.indexOf(a.day);
+      final dayB = CampusProvider.days.indexOf(b.day);
+      if (dayA != dayB) return dayA.compareTo(dayB);
+      return a.start.compareTo(b.start);
+    });
 
     showModalBottomSheet(
       context: context,
@@ -346,7 +372,9 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                   width: 56,
                                   child: Icon(Icons.meeting_room),
                                 ),
-                          title: Text(s.subject),
+                          title: Text(
+                            '${s.subject} (${s.day})',
+                          ), // Added day here
                           subtitle: Text(
                             '${fmt.format(s.start)}–${fmt.format(s.end)}',
                           ),

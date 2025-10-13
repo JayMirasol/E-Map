@@ -1,9 +1,14 @@
+// lib/screens/floorplan_screen.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
 import '../models/room.dart';
 import '../widgets/room_search.dart';
+import '../widgets/room_details_sheet.dart';
 
+/// FloorplanScreen - interactive CCA floorplan for 1F and 2F.
+/// Shows pins, supports start/destination, pathfinding (A*), waypoints, and path arrows.
 class FloorplanScreen extends StatelessWidget {
   const FloorplanScreen({super.key});
 
@@ -21,11 +26,26 @@ class FloorplanScreen extends StatelessWidget {
           length: floors.length,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('Floorplan'),
+              title: const Text('CCA Floorplan'),
               bottom: TabBar(
                 isScrollable: false,
                 tabs: floors.map((f) => Tab(text: '${f}F')).toList(),
               ),
+              actions: [
+                IconButton(
+                  tooltip: 'Search rooms',
+                  icon: const Icon(Icons.search),
+                  onPressed: () async {
+                    final selected = await showSearch<Room?>(
+                      context: context,
+                      delegate: RoomSearchDelegate(source: rooms),
+                    );
+                    if (selected != null) {
+                      _openRoomSheet(context, selected);
+                    }
+                  },
+                ),
+              ],
             ),
             body: TabBarView(
               children: floors.map((f) {
@@ -40,6 +60,27 @@ class FloorplanScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  static void _openRoomSheet(BuildContext context, Room room) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, sc) => SingleChildScrollView(
+          controller: sc,
+          child: RoomDetailsSheet(room: room),
+        ),
+      ),
     );
   }
 }
@@ -59,16 +100,16 @@ class _FloorCanvas extends StatefulWidget {
   State<_FloorCanvas> createState() => _FloorCanvasState();
 }
 
-class _FloorCanvasState extends State<_FloorCanvas> {
+class _FloorCanvasState extends State<_FloorCanvas>
+    with TickerProviderStateMixin {
   final TransformationController _tc = TransformationController();
   final GlobalKey _canvasKey = GlobalKey();
 
   Room? _startRoom;
   Room? _endRoom;
 
-  // NEW: waypoint support
-  final List<Offset> _waypoints =
-      []; // in canvas logical px (after fx/fy -> px)
+  // store fractional waypoints (0..1), not px — convert to px in build()
+  final List<Offset> _fracWaypoints = [];
   bool _addingWaypoint = false;
 
   @override
@@ -82,11 +123,12 @@ class _FloorCanvasState extends State<_FloorCanvas> {
       context: context,
       delegate: RoomSearchDelegate(source: widget.rooms),
     );
+    if (!mounted) return;
     if (selected != null) {
       setState(() {
         _startRoom = selected;
-        _endRoom = null; // reset destination when start changes
-        _waypoints.clear(); // reset path shape
+        _endRoom = null;
+        _fracWaypoints.clear();
         _addingWaypoint = false;
       });
     }
@@ -97,46 +139,50 @@ class _FloorCanvasState extends State<_FloorCanvas> {
       context: context,
       delegate: RoomSearchDelegate(source: widget.rooms),
     );
+    if (!mounted) return;
     if (selected != null) {
       setState(() {
         _endRoom = selected;
-        // keep waypoints
         _addingWaypoint = false;
       });
+
+      // If we have both start & end, request provider for graph path
+      if (_startRoom != null && _endRoom != null) {
+        final provider = context.read<CampusProvider>();
+        final nodes = await provider.findPathBetweenRooms(
+          _startRoom!.id,
+          _endRoom!.id,
+        );
+        if (nodes.isNotEmpty) {
+          setState(() {
+            _fracWaypoints.clear();
+            for (final p in nodes) {
+              final fx = (p['fx'] ?? 0.5).clamp(0.0, 1.0);
+              final fy = (p['fy'] ?? 0.5).clamp(0.0, 1.0);
+              _fracWaypoints.add(Offset(fx, fy));
+            }
+          });
+        } else {
+          // fallback to straight line fractional points
+          setState(() {
+            _fracWaypoints.clear();
+            _fracWaypoints.add(
+              Offset(_startRoom!.fx ?? 0.5, _startRoom!.fy ?? 0.5),
+            );
+            _fracWaypoints.add(
+              Offset(_endRoom!.fx ?? 0.5, _endRoom!.fy ?? 0.5),
+            );
+          });
+        }
+      }
     }
   }
-
-  // Optional helper: add a waypoint at a chosen room center (via search)
-  // Future<void> _addWaypointFromRoom() async {
-  //   final selected = await showSearch<Room?>(
-  //     context: context,
-  //     delegate: RoomSearchDelegate(source: widget.rooms),
-  //   );
-  //   if (selected != null && selected.fx != null && selected.fy != null) {
-  //     final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
-  //     if (box == null) return;
-  //     final size = box.size;
-  //     setState(() {
-  //       _waypoints.add(
-  //         Offset(selected.fx! * size.width, selected.fy! * size.height),
-  //       );
-  //     });
-  //   } else {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(
-  //         content: Text(
-  //           'This room has no fx/fy yet. Long-press to capture coordinates.',
-  //         ),
-  //       ),
-  //     );
-  //   }
-  // }
 
   void _clearPath() {
     setState(() {
       _startRoom = null;
       _endRoom = null;
-      _waypoints.clear();
+      _fracWaypoints.clear();
       _addingWaypoint = false;
     });
   }
@@ -146,61 +192,101 @@ class _FloorCanvasState extends State<_FloorCanvas> {
     return Offset(r.fx! * w, r.fy! * h);
   }
 
+  List<Offset> _buildPathPointsPx(double w, double h) {
+    final points = <Offset>[];
+    // Start anchor: room point if present
+    if (_fracWaypoints.isNotEmpty) {
+      for (final f in _fracWaypoints) {
+        points.add(Offset(f.dx * w, f.dy * h));
+      }
+    } else {
+      final start = _roomOffset(_startRoom, w, h);
+      final end = _roomOffset(_endRoom, w, h);
+      if (start != null) points.add(start);
+      if (end != null) points.add(end);
+    }
+    return points;
+  }
+
   Widget _buildHotspot(Room r, Size parentSize, Color color) {
-    final dx = (r.fx ?? 0) * parentSize.width;
-    final dy = (r.fy ?? 0) * parentSize.height;
+    final dx = (r.fx ?? 0.5) * parentSize.width;
+    final dy = (r.fy ?? 0.5) * parentSize.height;
 
     return Positioned(
       left: dx - 14,
       top: dy - 14,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            builder: (_) => DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.3,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (ctx, sc) => SingleChildScrollView(
+                controller: sc,
+                child: RoomDetailsSheet(room: r),
+              ),
+            ),
+          );
+        },
+        onLongPress: () {
+          final fx = r.fx ?? 0;
+          final fy = r.fy ?? 0;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Room ${r.name} fx=${fx.toStringAsFixed(3)}, fy=${fy.toStringAsFixed(3)}',
+              ),
+            ),
+          );
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.place, size: 16, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: Text(
+                r.name,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
+              ),
             ),
-            child: const Icon(Icons.place, size: 16, color: Colors.white),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.9),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.black12),
-            ),
-            child: Text(
-              r.name,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
-  }
-
-  // Build a simple polyline: start -> waypoints -> end
-  List<Offset> _buildPathPoints(double w, double h) {
-    final points = <Offset>[];
-    final start = _roomOffset(_startRoom, w, h);
-    final end = _roomOffset(_endRoom, w, h);
-
-    if (start != null) points.add(start);
-    points.addAll(_waypoints); // already in canvas pixel coords
-    if (end != null) points.add(end);
-
-    return points;
   }
 
   @override
@@ -216,11 +302,10 @@ class _FloorCanvasState extends State<_FloorCanvas> {
         final hasStart = _startRoom != null && startPos != null;
         final hasEnd = _endRoom != null && endPos != null;
 
-        final pathPoints = _buildPathPoints(w, h);
+        final pathPoints = _buildPathPointsPx(w, h);
 
         return Stack(
           children: [
-            // Map + overlays
             InteractiveViewer(
               transformationController: _tc,
               minScale: 0.7,
@@ -233,42 +318,96 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       child: Image.asset(widget.imagePath, fit: BoxFit.contain),
                     ),
 
-                    // Polyline path (start -> waypoints -> end)
+                    // route with arrows
                     if (pathPoints.length >= 2)
                       CustomPaint(
-                        painter: _PolylinePainter(points: pathPoints),
+                        painter: PathWithArrowsPainter(
+                          points: pathPoints,
+                          color: Colors.green,
+                        ),
                         size: Size(w, h),
                       ),
 
-                    // Show ONLY the selected Start and Destination
                     if (hasStart)
                       _buildHotspot(_startRoom!, Size(w, h), Colors.green),
                     if (hasEnd)
                       _buildHotspot(_endRoom!, Size(w, h), Colors.red),
 
-                    // Optional: draw small dots for waypoints
-                    ..._waypoints.map(
-                      (pt) => Positioned(
-                        left: pt.dx - 6,
-                        top: pt.dy - 6,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Colors.deepPurple,
-                            shape: BoxShape.circle,
+                    // waypoints as small dots (computed earlier from fractional)
+                    ..._fracWaypoints
+                        .map(
+                          (f) => Positioned(
+                            left: f.dx * w - 6,
+                            top: f.dy * h - 6,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                color: Colors.deepPurple,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
+                        )
+                        .toList(),
+
+                    // draw simple pins for rooms
+                    ...widget.rooms
+                        .where((r) => r != _startRoom && r != _endRoom)
+                        .map((r) {
+                          final dx = (r.fx ?? 0.5) * w;
+                          final dy = (r.fy ?? 0.5) * h;
+                          return Positioned(
+                            left: dx - 12,
+                            top: dy - 12,
+                            child: GestureDetector(
+                              onTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surface,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(12),
+                                    ),
+                                  ),
+                                  builder: (_) => DraggableScrollableSheet(
+                                    initialChildSize: 0.5,
+                                    minChildSize: 0.3,
+                                    maxChildSize: 0.9,
+                                    expand: false,
+                                    builder: (ctx, sc) => SingleChildScrollView(
+                                      controller: sc,
+                                      child: RoomDetailsSheet(room: r),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withOpacity(0.9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.place,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                        })
+                        .toList(),
                   ],
                 ),
               ),
             ),
 
-            // Long-press handler:
-            // - if adding waypoint: drop a waypoint at pressed spot (in canvas logical px)
-            // - else: calibration readout
+            // Long-press capture and waypoint placement
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -277,7 +416,6 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       _canvasKey.currentContext?.findRenderObject()
                           as RenderBox?;
                   if (box == null) return;
-
                   final localOnCanvas = box.globalToLocal(
                     details.globalPosition,
                   );
@@ -286,21 +424,18 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                     inv,
                     localOnCanvas,
                   );
-
                   final fx = (logical.dx / w).clamp(0.0, 1.0);
                   final fy = (logical.dy / h).clamp(0.0, 1.0);
 
                   if (_addingWaypoint) {
-                    // add waypoint at logical px position
                     setState(() {
-                      _waypoints.add(Offset(fx * w, fy * h));
+                      _fracWaypoints.add(Offset(fx, fy));
                       _addingWaypoint = false;
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Waypoint added.')),
                     );
                   } else {
-                    // calibration readout
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -313,14 +448,13 @@ class _FloorCanvasState extends State<_FloorCanvas> {
               ),
             ),
 
-            // Controls row
+            // Controls
             Positioned(
               bottom: 16,
               left: 16,
               right: 16,
               child: Row(
                 children: [
-                  // Choose Start (green when selected)
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -341,8 +475,6 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Choose Destination (red when selected)
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -359,8 +491,6 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // NEW: Add Waypoint (enabled when start is set)
                   SizedBox(
                     width: 56,
                     height: 48,
@@ -396,30 +526,7 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                       ),
                     ),
                   ),
-                  // const SizedBox(width: 8),
-
-                  // // (Optional) Add waypoint from a room center, via search
-                  // SizedBox(
-                  //   width: 56,
-                  //   height: 48,
-                  //   child: Tooltip(
-                  //     message: 'Add waypoint from room',
-                  //     child: ElevatedButton(
-                  //       style: ElevatedButton.styleFrom(
-                  //         backgroundColor: Colors.grey.shade200,
-                  //         foregroundColor: Colors.black87,
-                  //         padding: EdgeInsets.zero,
-                  //       ),
-                  //       onPressed: _startRoom == null
-                  //           ? null
-                  //           : _addWaypointFromRoom,
-                  //       child: const Icon(Icons.add_location_alt),
-                  //     ),
-                  //   ),
-                  // ),
                   const SizedBox(width: 8),
-
-                  // Clear Path
                   SizedBox(
                     width: 56,
                     height: 48,
@@ -434,7 +541,7 @@ class _FloorCanvasState extends State<_FloorCanvas> {
                         onPressed:
                             (_startRoom != null ||
                                 _endRoom != null ||
-                                _waypoints.isNotEmpty)
+                                _fracWaypoints.isNotEmpty)
                             ? _clearPath
                             : null,
                         child: const Icon(Icons.clear),
@@ -451,32 +558,60 @@ class _FloorCanvasState extends State<_FloorCanvas> {
   }
 }
 
-class _PolylinePainter extends CustomPainter {
+/// Painter that draws a polyline and arrowheads along segments.
+class PathWithArrowsPainter extends CustomPainter {
   final List<Offset> points;
+  final Color color;
 
-  _PolylinePainter({required this.points});
+  PathWithArrowsPainter({required this.points, this.color = Colors.green});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (points.length < 2) return;
 
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
-    }
-
     final paint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 3
+      ..color = color
+      ..strokeWidth = 4
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+      ..strokeCap = StrokeCap.round;
 
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++)
+      path.lineTo(points[i].dx, points[i].dy);
     canvas.drawPath(path, paint);
+
+    // draw arrowheads on each segment at 70% of its length
+    const arrowLen = 10.0;
+    const arrowAngle = 0.6; // radians
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final dx = b.dx - a.dx;
+      final dy = b.dy - a.dy;
+      final angle = math.atan2(dy, dx);
+
+      final pos = Offset(a.dx + dx * 0.7, a.dy + dy * 0.7);
+      final p1 = Offset(
+        pos.dx - arrowLen * math.cos(angle - arrowAngle),
+        pos.dy - arrowLen * math.sin(angle - arrowAngle),
+      );
+      final p2 = Offset(
+        pos.dx - arrowLen * math.cos(angle + arrowAngle),
+        pos.dy - arrowLen * math.sin(angle + arrowAngle),
+      );
+
+      final arrowPath = Path()
+        ..moveTo(pos.dx, pos.dy)
+        ..lineTo(p1.dx, p1.dy)
+        ..moveTo(pos.dx, pos.dy)
+        ..lineTo(p2.dx, p2.dy);
+      canvas.drawPath(arrowPath, paint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _PolylinePainter old) {
+  bool shouldRepaint(covariant PathWithArrowsPainter old) {
     if (old.points.length != points.length) return true;
     for (int i = 0; i < points.length; i++) {
       if (old.points[i] != points[i]) return true;

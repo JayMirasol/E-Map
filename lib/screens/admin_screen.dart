@@ -3,9 +3,17 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/schedule.dart';
 import '../providers/campus_provider.dart';
+import 'login_screen.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
+
+  static void navigateTo(BuildContext context) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +163,7 @@ class _ScheduleFormState extends State<_ScheduleForm> {
   String _day = 'Mon';
   TimeOfDay _start = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _end = const TimeOfDay(hour: 9, minute: 30);
+  final List<Map<String, dynamic>> _schedules = [];
 
   @override
   void initState() {
@@ -167,6 +176,12 @@ class _ScheduleFormState extends State<_ScheduleForm> {
       _day = s.day;
       _start = TimeOfDay(hour: s.start.hour, minute: s.start.minute);
       _end = TimeOfDay(hour: s.end.hour, minute: s.end.minute);
+      _schedules.add({
+        'day': _day,
+        'start': _start,
+        'end': _end,
+        'roomId': _roomId,
+      });
     }
   }
 
@@ -300,6 +315,128 @@ class _ScheduleFormState extends State<_ScheduleForm> {
               ),
               const SizedBox(height: 16),
 
+              // Add multiple schedules section
+              const SizedBox(height: 16),
+              Text(
+                'Schedules',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListView.builder(
+                shrinkWrap: true,
+                itemCount: _schedules.length,
+                itemBuilder: (_, index) {
+                  final schedule = _schedules[index];
+                  return ListTile(
+                    title: Text('${schedule['day']}'),
+                    subtitle: Text(
+                      'Start: ${_fmt(schedule['start'])}, End: ${_fmt(schedule['end'])}, Room: ${schedule['roomId']}',
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () =>
+                          setState(() => _schedules.removeAt(index)),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Add Schedule'),
+                onPressed: () {
+                  if (_roomId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please select a room.')),
+                    );
+                    return;
+                  }
+                  setState(() {
+                    _schedules.add({
+                      'day': _day,
+                      'start': _start,
+                      'end': _end,
+                      'roomId': _roomId,
+                    });
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (widget.existing != null)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.delete, color: Colors.redAccent),
+                        label: const Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.redAccent),
+                        ),
+                        onPressed: () async {
+                          final confirmed =
+                              await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Delete schedule?'),
+                                  content: Text(
+                                    'Are you sure you want to delete this schedule?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+                          if (confirmed) {
+                            final p = context.read<CampusProvider>();
+                            await p.deleteSchedule(widget.existing!.id);
+                            if (context.mounted) Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                  if (widget.existing != null) const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Schedule'),
+                      onPressed: () {
+                        if (_roomId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a room.'),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          _schedules.add({
+                            'day': _day,
+                            'start': _start,
+                            'end': _end,
+                            'roomId': _roomId,
+                          });
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // Save button
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -307,51 +444,52 @@ class _ScheduleFormState extends State<_ScheduleForm> {
                   label: Text(widget.existing == null ? 'Save' : 'Update'),
                   onPressed: () async {
                     if (!_formKey.currentState!.validate()) return;
-                    if (_roomId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a room.')),
-                      );
-                      return;
-                    }
-                    final startDt = DateTime(
-                      2025,
-                      1,
-                      1,
-                      _start.hour,
-                      _start.minute,
-                    );
-                    final endDt = DateTime(2025, 1, 1, _end.hour, _end.minute);
-                    if (!startDt.isBefore(endDt)) {
+                    if (_schedules.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Start time must be before end time.'),
+                          content: Text('Please add at least one schedule.'),
                         ),
                       );
                       return;
                     }
 
                     final p = context.read<CampusProvider>();
-                    if (widget.existing == null) {
+                    for (final schedule in _schedules) {
+                      final startDt = DateTime(
+                        2025,
+                        1,
+                        1,
+                        schedule['start'].hour,
+                        schedule['start'].minute,
+                      );
+                      final endDt = DateTime(
+                        2025,
+                        1,
+                        1,
+                        schedule['end'].hour,
+                        schedule['end'].minute,
+                      );
+                      if (!startDt.isBefore(endDt)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Start time must be before end time.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
                       final newSched = Schedule(
                         id: DateTime.now().microsecondsSinceEpoch.toString(),
                         instructor: _instructor.text.trim(),
                         subject: _subject.text.trim(),
-                        roomId: _roomId!,
+                        roomId: schedule['roomId'],
                         start: startDt,
                         end: endDt,
-                        day: _day,
+                        day: schedule['day'],
                       );
                       await p.addSchedule(newSched);
-                    } else {
-                      final upd = widget.existing!.copyWith(
-                        instructor: _instructor.text.trim(),
-                        subject: _subject.text.trim(),
-                        roomId: _roomId!,
-                        start: startDt,
-                        end: endDt,
-                        day: _day,
-                      );
-                      await p.updateSchedule(upd);
                     }
                     if (context.mounted) Navigator.pop(context);
                   },

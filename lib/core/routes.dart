@@ -9,6 +9,7 @@ import '../screens/admin_screen.dart';
 import '../screens/landing_screen.dart';
 import '../screens/about_screen.dart';
 import '../screens/floorplan_screen.dart';
+import '../screens/login_screen.dart';
 
 class AppRoutes {
   static const landing = '/landing';
@@ -21,6 +22,7 @@ class AppRoutes {
   static const admin = '/admin';
   static const about = '/about';
   static const floorplan = '/floorplan';
+  static const login = '/login';
 
   static Map<String, WidgetBuilder> build() => {
     landing: (_) => const LandingScreen(),
@@ -33,5 +35,6 @@ class AppRoutes {
     admin: (_) => const AdminScreen(),
     about: (_) => const AboutScreen(),
     floorplan: (_) => const FloorplanScreen(),
+    login: (_) => const LoginScreen(),
   };
 }

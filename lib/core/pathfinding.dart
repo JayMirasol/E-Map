@@ -12,8 +12,9 @@ class _PQEntry<T> implements Comparable<_PQEntry<T>> {
 
 class Pathfinder {
   static List<String> aStar(FloorGraph g, String startId, String goalId) {
-    if (!g.nodes.containsKey(startId) || !g.nodes.containsKey(goalId))
+    if (!g.nodes.containsKey(startId) || !g.nodes.containsKey(goalId)) {
       return [];
+    }
 
     double h(String a, String b) {
       final na = g.nodes[a]!, nb = g.nodes[b]!;

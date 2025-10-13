@@ -46,4 +46,7 @@ flutter:
   assets:
     - assets/data/
     - assets/images/
+    - assets/images/instructors/jay_mirasol.png
+    - assets/images/instructors/lance_bulanadi.png
+    - assets/images/instructors/prof_cruz.jpg
 

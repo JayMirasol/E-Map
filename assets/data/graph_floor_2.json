@@ -199,6 +199,16 @@
       "y": 700,
       "type": "door",
       "room": "Psyche Lab R211"
+    },
+    "Stair_L": {
+      "x": 220,
+      "y": 220,
+      "type": "stair"
+    },
+    "Stair_R": {
+      "x": 780,
+      "y": 220,
+      "type": "stair"
     }
   },
   "edges": [
@@ -621,6 +631,26 @@
       "from": "SE",
       "to": "d_PsycheLab",
       "cost": 0.0
+    },
+    {
+      "from": "N",
+      "to": "Stair_L",
+      "cost": 90.0
+    },
+    {
+      "from": "Stair_L",
+      "to": "N",
+      "cost": 90.0
+    },
+    {
+      "from": "N",
+      "to": "Stair_R",
+      "cost": 90.0
+    },
+    {
+      "from": "Stair_R",
+      "to": "N",
+      "cost": 90.0
     }
   ],
   "rooms": {

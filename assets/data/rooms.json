@@ -76,7 +76,7 @@
 
   {"id":"R311_AVR","name":"R311 (AUDIO VISUAL ROOM)","type":"classroom","floor":3,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 
-  {"id":"MULTI_PURPOSE_HALL","name":"MULTI-PURPOSE HALL","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.489,"fy":0.528},
+  {"id":"MULTI_PURPOSE_HALL","name":"MULTI-PURPOSE HALL","type":"office","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 
   {"id":"L401","name":"L401","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"L402","name":"L402","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},

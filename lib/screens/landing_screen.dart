@@ -100,7 +100,7 @@ class LandingScreen extends StatelessWidget {
                           icon: const Icon(Icons.info_outline),
                           label: const Text('Administrator'),
                           onPressed: () =>
-                              Navigator.pushNamed(context, AppRoutes.admin),
+                              Navigator.pushNamed(context, AppRoutes.login),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
                           ),

@@ -1,5 +1,6 @@
 // lib/providers/campus_provider.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
 import '../models/room.dart';
@@ -14,7 +15,6 @@ class CampusProvider with ChangeNotifier {
   String? _selectedRoomId;
 
   // NEW: map of instructor -> photo URL (populated from assets or remote source)
-  // This is public for quick debug inspection if needed.
   final Map<String, String> instructorPhotos = {};
 
   List<Room> get rooms => _rooms;
@@ -29,22 +29,13 @@ class CampusProvider with ChangeNotifier {
   Future<void> load() async {
     // Rooms still from assets for now
     if (_rooms.isEmpty) {
-      try {
-        final roomsStr = await rootBundle.loadString('assets/data/rooms.json');
-        _rooms = (jsonDecode(roomsStr) as List)
-            .map((e) => Room.fromJson(e))
-            .toList();
-      } catch (e, st) {
-        if (kDebugMode) {
-          debugPrint('Failed to load rooms.json: $e\n$st');
-        }
-        _rooms = [];
-      }
+      final roomsStr = await rootBundle.loadString('assets/data/rooms.json');
+      _rooms = (jsonDecode(roomsStr) as List)
+          .map((e) => Room.fromJson(e))
+          .toList();
     }
 
     // Optionally load instructor photos if you store them in assets/data/instructor_photos.json
-    // Example JSON shape: { "John Doe": "https://...", "Jane Smith": "assets/images/jane.jpg" }
-    instructorPhotos.clear();
     try {
       final photosStr = await rootBundle.loadString(
         'assets/data/instructor_photos.json',
@@ -52,38 +43,21 @@ class CampusProvider with ChangeNotifier {
       final Map<String, dynamic> pmap =
           jsonDecode(photosStr) as Map<String, dynamic>;
       pmap.forEach((k, v) {
-        if (v is String && v.isNotEmpty) instructorPhotos[k.trim()] = v.trim();
+        if (v is String && v.isNotEmpty) instructorPhotos[k] = v;
       });
-
       if (kDebugMode) {
         debugPrint(
           'Loaded instructor_photos.json with ${instructorPhotos.length} entries.',
         );
-        for (final e in instructorPhotos.entries) {
-          debugPrint('  photo: "${e.key}" -> "${e.value}"');
-        }
+        instructorPhotos.forEach((k, v) => debugPrint('  photo: "$k" -> "$v"'));
       }
-    } catch (e, st) {
-      // file missing is ok — thumbnails will fall back to initials
-      if (kDebugMode) {
-        debugPrint(
-          'No instructor_photos.json loaded (or failed to parse): $e\n$st',
-        );
-      }
-      instructorPhotos.clear();
+    } catch (_) {
+      if (kDebugMode) debugPrint('No instructor_photos.json found (ok).');
     }
 
     // Schedules from local document storage (seeded from assets on first run)
-    try {
-      final rows = await LocalStore.readSchedules();
-      _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
-    } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('Failed to read schedules from LocalStore: $e\n$st');
-      }
-      _schedules = [];
-    }
-
+    final rows = await LocalStore.readSchedules();
+    _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
     notifyListeners();
     await _loadGraphs();
   }
@@ -162,73 +136,12 @@ class CampusProvider with ChangeNotifier {
 
   // --------------- NEW: instructor helpers ----------------
 
-  /// Robust lookup for instructor photos.
-  /// Tries exact match -> case-insensitive -> strip common prefixes -> last-name -> initials.
+  /// Returns photo URL for instructor or null.
   String? photoForInstructor(String instructor) {
-    if (instructor.trim().isEmpty) return null;
-
-    final key = instructor.trim();
-
-    // 1) exact match
-    if (instructorPhotos.containsKey(key)) return instructorPhotos[key];
-
-    // 2) case-insensitive exact
-    final ciExact = instructorPhotos.entries.firstWhere(
-      (e) => e.key.toLowerCase() == key.toLowerCase(),
-      orElse: () => const MapEntry('', ''),
-    );
-    if (ciExact.key.isNotEmpty) return ciExact.value;
-
-    // 3) strip common prefixes like "Prof.", "Dr.", "Mr.", "Ms.", "Eng."
-    final stripped = key
-        .replaceAll(
-          RegExp(
-            r'^(Prof\.?|Dr\.?|Mr\.?|Ms\.?|Eng\.?)\s*',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .trim();
-    if (instructorPhotos.containsKey(stripped))
-      return instructorPhotos[stripped];
-    final ciStripped = instructorPhotos.entries.firstWhere(
-      (e) => e.key.toLowerCase() == stripped.toLowerCase(),
-      orElse: () => const MapEntry('', ''),
-    );
-    if (ciStripped.key.isNotEmpty) return ciStripped.value;
-
-    // 4) try last-name match (if instructor has at least one space)
-    final parts = stripped
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.length >= 1) {
-      final last = parts.last;
-      final lastMatch = instructorPhotos.entries.firstWhere(
-        (e) => e.key.toLowerCase().contains(last.toLowerCase()),
-        orElse: () => const MapEntry('', ''),
-      );
-      if (lastMatch.key.isNotEmpty) return lastMatch.value;
-    }
-
-    // 5) try initials match (e.g., "JM" or "J M")
-    final initials = parts.isNotEmpty
-        ? parts.map((p) => p[0]).take(3).join().toUpperCase()
-        : '';
-    if (initials.isNotEmpty) {
-      final initMatch = instructorPhotos.entries.firstWhere(
-        (e) => e.key.replaceAll(RegExp(r'\s+'), '').toUpperCase() == initials,
-        orElse: () => const MapEntry('', ''),
-      );
-      if (initMatch.key.isNotEmpty) return initMatch.value;
-    }
-
-    // nothing found
-    return null;
+    return instructorPhotos[instructor];
   }
 
-  /// Returns true if instructor has a schedule AND that schedule includes current time
-  /// (also checks the weekday abbreviation so "available now" is accurate).
+  /// Returns true if instructor has a schedule AND that schedule includes current time.
   bool instructorAvailableNow(String instructor) {
     final now = DateTime.now();
     final weekday = todayAbbrev();
@@ -267,6 +180,209 @@ class CampusProvider with ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  // ---------- Pathfinding helpers (A* over FloorGraph) ----------
+
+  /// Find path between two rooms on the same floor, return list of fractional points
+  /// [{ 'fx': double, 'fy': double }, ...]. If graph missing or path fails, returns
+  /// start->end straight line (fallback).
+  Future<List<Map<String, double>>> findPathBetweenRooms(
+    String startRoomId,
+    String endRoomId,
+  ) async {
+    final startRoom = roomById(startRoomId);
+    final endRoom = roomById(endRoomId);
+    if (startRoom == null || endRoom == null) return [];
+
+    if (startRoom.floor == null ||
+        endRoom.floor == null ||
+        startRoom.floor != endRoom.floor) {
+      // different floors: no single-floor path (return empty or handle elevator stairs elsewhere)
+      return [];
+    }
+    final floor = startRoom.floor!;
+    final graph = graphForFloor(floor);
+    final startPoint = {'fx': startRoom.fx ?? 0.5, 'fy': startRoom.fy ?? 0.5};
+    final endPoint = {'fx': endRoom.fx ?? 0.5, 'fy': endRoom.fy ?? 0.5};
+
+    if (graph == null) {
+      // fallback straight line
+      return [startPoint, endPoint];
+    }
+
+    // Try to parse nodes from graph (for common shapes)
+    Map<String, Map<String, double>> nodesPos = {};
+    final Map<String, Map<String, double>> neighbors = {};
+
+    try {
+      // Use graph.nodes directly (avoid dead null-aware fallback)
+      final rawNodes = (graph.nodes) as Iterable<dynamic>? ?? [];
+      for (final rn in rawNodes) {
+        if (rn is Map) {
+          final id = rn['id']?.toString();
+          double? fx = (rn['fx'] ?? rn['x'] ?? rn['px']) is num
+              ? (rn['fx'] ?? rn['x'] ?? rn['px']).toDouble()
+              : null;
+          double? fy = (rn['fy'] ?? rn['y'] ?? rn['py']) is num
+              ? (rn['fy'] ?? rn['y'] ?? rn['py']).toDouble()
+              : null;
+
+          if (fx != null && fy != null && id != null && id.isNotEmpty) {
+            nodesPos[id] = {'fx': fx, 'fy': fy};
+          }
+
+          // neighbors parsing
+          final rawNeigh =
+              (rn['neighbors'] ?? rn['edges'] ?? rn['adj'])
+                  as Iterable<dynamic>? ??
+              [];
+          final mapNeigh = <String, double>{};
+          for (final e in rawNeigh) {
+            if (e is Map) {
+              final to = e['to']?.toString() ?? e['id']?.toString();
+              double cost = 1.0;
+              if (e['cost'] is num) cost = (e['cost'] as num).toDouble();
+              if (to != null) mapNeigh[to] = cost;
+            } else if (e is List && e.isNotEmpty) {
+              final to = e[0]?.toString();
+              final cost = (e.length > 1 && e[1] is num)
+                  ? (e[1] as num).toDouble()
+                  : 1.0;
+              if (to != null) mapNeigh[to] = cost;
+            }
+          }
+          if (id != null && mapNeigh.isNotEmpty) neighbors[id] = mapNeigh;
+        }
+      }
+    } catch (_) {
+      // permissive: continue to fallback
+    }
+
+    // If we couldn't parse nodes (empty), fallback:
+    if (nodesPos.isEmpty) {
+      return [startPoint, endPoint];
+    }
+
+    // If neighbors empty, auto-connect via k-nearest approach
+    Map<String, Map<String, double>> adj = {};
+    if (neighbors.isNotEmpty) {
+      adj = neighbors;
+    } else {
+      // build k-nearest adjacency (k=6)
+      final ids = nodesPos.keys.toList();
+      for (final id in ids) {
+        final p = nodesPos[id]!;
+        final dists = <String, double>{};
+        for (final other in ids) {
+          if (other == id) continue;
+          final q = nodesPos[other]!;
+          final dx = p['fx']! - q['fx']!;
+          final dy = p['fy']! - q['fy']!;
+          final dist = math.sqrt(dx * dx + dy * dy);
+          dists[other] = dist;
+        }
+        final sorted = dists.entries.toList()
+          ..sort((a, b) => a.value.compareTo(b.value));
+        final k = math.min(6, sorted.length);
+        final neigh = <String, double>{};
+        for (int i = 0; i < k; i++) neigh[sorted[i].key] = sorted[i].value;
+        adj[id] = neigh;
+      }
+    }
+
+    // helper: nearest node id to a fractional point
+    String nearestNode(
+      Map<String, Map<String, double>> nodes,
+      Map<String, double> pt,
+    ) {
+      String best = nodes.keys.first;
+      double bestD = double.infinity;
+      for (final k in nodes.keys) {
+        final n = nodes[k]!;
+        final dx = n['fx']! - pt['fx']!;
+        final dy = n['fy']! - pt['fy']!;
+        final d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = k;
+        }
+      }
+      return best;
+    }
+
+    final startNode = nearestNode(nodesPos, startPoint);
+    final endNode = nearestNode(nodesPos, endPoint);
+
+    // A* implementation
+    List<String> reconstructPath(Map<String, String> cameFrom, String current) {
+      final path = <String>[];
+      var c = current;
+      while (c.isNotEmpty) {
+        path.insert(0, c);
+        if (!cameFrom.containsKey(c)) break;
+        c = cameFrom[c]!;
+      }
+      return path;
+    }
+
+    final nodeIds = nodesPos.keys.toList();
+    final gScore = <String, double>{
+      for (final n in nodeIds) n: double.infinity,
+    };
+    final fScore = <String, double>{
+      for (final n in nodeIds) n: double.infinity,
+    };
+    final cameFrom = <String, String>{};
+    final open = <String>{startNode};
+
+    gScore[startNode] = 0.0;
+    final hx = nodesPos[startNode]!['fx']! - nodesPos[endNode]!['fx']!;
+    final hy = nodesPos[startNode]!['fy']! - nodesPos[endNode]!['fy']!;
+    fScore[startNode] = math.sqrt(hx * hx + hy * hy);
+
+    String? current;
+    while (open.isNotEmpty) {
+      // node in open with lowest fScore
+      current = open.reduce((a, b) => fScore[a]! < fScore[b]! ? a : b);
+
+      if (current == endNode) {
+        final idPath = reconstructPath(cameFrom, current);
+        // convert to fractional points
+        final out = <Map<String, double>>[];
+        for (final nid in idPath) {
+          final n = nodesPos[nid];
+          if (n != null) out.add({'fx': n['fx']!, 'fy': n['fy']!});
+        }
+        // anchor start & end exactly to room points
+        if (out.isNotEmpty) {
+          out.first['fx'] = startPoint['fx']!;
+          out.first['fy'] = startPoint['fy']!;
+          out[out.length - 1]['fx'] = endPoint['fx']!;
+          out[out.length - 1]['fy'] = endPoint['fy']!;
+        }
+        return out;
+      }
+
+      open.remove(current);
+      final neigh = adj[current] ?? {};
+      for (final ent in neigh.entries) {
+        final nbId = ent.key;
+        final cost = ent.value;
+        final tentativeG = gScore[current]! + cost;
+        if (tentativeG < (gScore[nbId] ?? double.infinity)) {
+          cameFrom[nbId] = current!;
+          gScore[nbId] = tentativeG;
+          final hx2 = nodesPos[nbId]!['fx']! - nodesPos[endNode]!['fx']!;
+          final hy2 = nodesPos[nbId]!['fy']! - nodesPos[endNode]!['fy']!;
+          fScore[nbId] = tentativeG + math.sqrt(hx2 * hx2 + hy2 * hy2);
+          if (!open.contains(nbId)) open.add(nbId);
+        }
+      }
+    }
+
+    // If we reach here, no path found; fallback straight
+    return [startPoint, endPoint];
   }
 
   // --------- CRUD for schedules ---------
