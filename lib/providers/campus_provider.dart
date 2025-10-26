@@ -286,7 +286,9 @@ class CampusProvider with ChangeNotifier {
           ..sort((a, b) => a.value.compareTo(b.value));
         final k = math.min(6, sorted.length);
         final neigh = <String, double>{};
-        for (int i = 0; i < k; i++) neigh[sorted[i].key] = sorted[i].value;
+        for (int i = 0; i < k; i++) {
+          neigh[sorted[i].key] = sorted[i].value;
+        }
         adj[id] = neigh;
       }
     }
@@ -371,7 +373,7 @@ class CampusProvider with ChangeNotifier {
         final cost = ent.value;
         final tentativeG = gScore[current]! + cost;
         if (tentativeG < (gScore[nbId] ?? double.infinity)) {
-          cameFrom[nbId] = current!;
+          cameFrom[nbId] = current;
           gScore[nbId] = tentativeG;
           final hx2 = nodesPos[nbId]!['fx']! - nodesPos[endNode]!['fx']!;
           final hy2 = nodesPos[nbId]!['fy']! - nodesPos[endNode]!['fy']!;

@@ -334,22 +334,20 @@ class _FloorCanvasState extends State<_FloorCanvas>
                       _buildHotspot(_endRoom!, Size(w, h), Colors.red),
 
                     // waypoints as small dots (computed earlier from fractional)
-                    ..._fracWaypoints
-                        .map(
-                          (f) => Positioned(
-                            left: f.dx * w - 6,
-                            top: f.dy * h - 6,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Colors.deepPurple,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
+                    ..._fracWaypoints.map(
+                      (f) => Positioned(
+                        left: f.dx * w - 6,
+                        top: f.dy * h - 6,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.deepPurple,
+                            shape: BoxShape.circle,
                           ),
-                        )
-                        .toList(),
+                        ),
+                      ),
+                    ),
 
                     // draw simple pins for rooms
                     ...widget.rooms
@@ -400,8 +398,7 @@ class _FloorCanvasState extends State<_FloorCanvas>
                               ),
                             ),
                           );
-                        })
-                        .toList(),
+                        }),
                   ],
                 ),
               ),
@@ -576,8 +573,9 @@ class PathWithArrowsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++)
+    for (int i = 1; i < points.length; i++) {
       path.lineTo(points[i].dx, points[i].dy);
+    }
     canvas.drawPath(path, paint);
 
     // draw arrowheads on each segment at 70% of its length

@@ -317,9 +317,9 @@ class _ScheduleFormState extends State<_ScheduleForm> {
 
               // Add multiple schedules section
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Schedules',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               ListView.builder(
@@ -381,7 +381,7 @@ class _ScheduleFormState extends State<_ScheduleForm> {
                                 context: context,
                                 builder: (_) => AlertDialog(
                                   title: const Text('Delete schedule?'),
-                                  content: Text(
+                                  content: const Text(
                                     'Are you sure you want to delete this schedule?',
                                   ),
                                   actions: [

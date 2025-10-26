@@ -191,12 +191,13 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                   ),
                                   trailing: const Icon(Icons.map),
                                   onTap: () {
-                                    if (room != null)
+                                    if (room != null) {
                                       provider.selectRoom(room.id);
+                                    }
                                     Navigator.pushNamed(context, AppRoutes.map);
                                   },
                                 );
-                              }).toList(),
+                              }),
                             ],
                           );
                         }).toList(),
