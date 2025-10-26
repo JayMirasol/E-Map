@@ -1,5 +1,4 @@
 // lib/screens/floorplan_screen.dart
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
@@ -333,21 +332,7 @@ class _FloorCanvasState extends State<_FloorCanvas>
                     if (hasEnd)
                       _buildHotspot(_endRoom!, Size(w, h), Colors.red),
 
-                    // waypoints as small dots (computed earlier from fractional)
-                    ..._fracWaypoints.map(
-                      (f) => Positioned(
-                        left: f.dx * w - 6,
-                        top: f.dy * h - 6,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Colors.deepPurple,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ),
+                    // Waypoint markers removed by request (show path only)
 
                     // draw simple pins for rooms
                     ...widget.rooms
@@ -555,7 +540,7 @@ class _FloorCanvasState extends State<_FloorCanvas>
   }
 }
 
-/// Painter that draws a polyline and arrowheads along segments.
+/// Painter that draws a polyline only (no arrows).
 class PathWithArrowsPainter extends CustomPainter {
   final List<Offset> points;
   final Color color;
@@ -577,35 +562,6 @@ class PathWithArrowsPainter extends CustomPainter {
       path.lineTo(points[i].dx, points[i].dy);
     }
     canvas.drawPath(path, paint);
-
-    // draw arrowheads on each segment at 70% of its length
-    const arrowLen = 10.0;
-    const arrowAngle = 0.6; // radians
-
-    for (int i = 0; i < points.length - 1; i++) {
-      final a = points[i];
-      final b = points[i + 1];
-      final dx = b.dx - a.dx;
-      final dy = b.dy - a.dy;
-      final angle = math.atan2(dy, dx);
-
-      final pos = Offset(a.dx + dx * 0.7, a.dy + dy * 0.7);
-      final p1 = Offset(
-        pos.dx - arrowLen * math.cos(angle - arrowAngle),
-        pos.dy - arrowLen * math.sin(angle - arrowAngle),
-      );
-      final p2 = Offset(
-        pos.dx - arrowLen * math.cos(angle + arrowAngle),
-        pos.dy - arrowLen * math.sin(angle + arrowAngle),
-      );
-
-      final arrowPath = Path()
-        ..moveTo(pos.dx, pos.dy)
-        ..lineTo(p1.dx, p1.dy)
-        ..moveTo(pos.dx, pos.dy)
-        ..lineTo(p2.dx, p2.dy);
-      canvas.drawPath(arrowPath, paint);
-    }
   }
 
   @override

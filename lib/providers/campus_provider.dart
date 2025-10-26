@@ -26,6 +26,10 @@ class CampusProvider with ChangeNotifier {
   final Map<int, FloorGraph> _floorGraphs = {};
   FloorGraph? graphForFloor(int floor) => _floorGraphs[floor];
 
+  // Admin-controlled path overrides loaded from assets/data/path_overrides.json
+  // Shape: { "4": { "L406->R405": ["L403", "R403"] } }
+  final Map<int, Map<String, List<String>>> _pathOverrides = {};
+
   Future<void> load() async {
     // Rooms still from assets for now
     if (_rooms.isEmpty) {
@@ -60,6 +64,7 @@ class CampusProvider with ChangeNotifier {
     _schedules = rows.map((e) => Schedule.fromJson(e)).toList();
     notifyListeners();
     await _loadGraphs();
+    await _loadPathOverrides();
   }
 
   Future<void> _loadGraphs() async {
@@ -72,6 +77,38 @@ class CampusProvider with ChangeNotifier {
       } catch (_) {
         // If file missing, skip; auto-routing just won’t be available for that floor
       }
+    }
+  }
+
+  Future<void> _loadPathOverrides() async {
+    try {
+      final txt = await rootBundle.loadString(
+        'assets/data/path_overrides.json',
+      );
+      final raw = jsonDecode(txt) as Map<String, dynamic>;
+      _pathOverrides.clear();
+      raw.forEach((floorKey, value) {
+        final f = int.tryParse(floorKey);
+        if (f == null) return;
+        final mm = <String, List<String>>{};
+        if (value is Map<String, dynamic>) {
+          value.forEach((pair, v) {
+            if (v is List) {
+              mm[pair] = v.map((e) => e.toString()).toList();
+            }
+          });
+        }
+        if (mm.isNotEmpty) _pathOverrides[f] = mm;
+      });
+      if (kDebugMode) {
+        debugPrint(
+          'Loaded path_overrides for floors: '
+          '${_pathOverrides.keys.toList()}',
+        );
+      }
+    } catch (_) {
+      // optional file; ignore if missing
+      if (kDebugMode) debugPrint('No path_overrides.json found (ok).');
     }
   }
 
@@ -184,13 +221,15 @@ class CampusProvider with ChangeNotifier {
 
   // ---------- Pathfinding helpers (A* over FloorGraph) ----------
 
-  /// Find path between two rooms on the same floor, return list of fractional points
-  /// [{ 'fx': double, 'fy': double }, ...]. If graph missing or path fails, returns
-  /// start->end straight line (fallback).
+  /// Find a hallway-accurate route between rooms on the same floor using the
+  /// FloorGraph. Returns a polyline as fractional points: [{fx, fy}, ...].
+  /// If the graph is missing or no route is found, we fall back to a simple
+  /// straight line from the room centers.
   Future<List<Map<String, double>>> findPathBetweenRooms(
     String startRoomId,
-    String endRoomId,
-  ) async {
+    String endRoomId, {
+    bool allowOverrides = true,
+  }) async {
     final startRoom = roomById(startRoomId);
     final endRoom = roomById(endRoomId);
     if (startRoom == null || endRoom == null) return [];
@@ -198,136 +237,106 @@ class CampusProvider with ChangeNotifier {
     if (startRoom.floor == null ||
         endRoom.floor == null ||
         startRoom.floor != endRoom.floor) {
-      // different floors: no single-floor path (return empty or handle elevator stairs elsewhere)
+      // Different floors handled elsewhere (stairs/elevators). No single-graph route.
       return [];
     }
     final floor = startRoom.floor!;
+
+    // Routing overrides loaded from assets (admin-controlled)
+    if (allowOverrides) {
+      final map = _pathOverrides[floor];
+      if (map != null) {
+        final key = '${startRoom.id}->${endRoom.id}';
+        final list = map[key];
+        if (list != null && list.isNotEmpty) {
+          final ids = [startRoom.id, ...list, endRoom.id];
+          final out = <Map<String, double>>[];
+          for (int i = 0; i < ids.length - 1; i++) {
+            final seg = await findPathBetweenRooms(
+              ids[i],
+              ids[i + 1],
+              allowOverrides: false,
+            );
+            if (seg.isEmpty) continue;
+            if (out.isEmpty) {
+              out.addAll(seg);
+            } else {
+              out.addAll(seg.skip(1));
+            }
+          }
+          if (out.isNotEmpty) return out;
+        }
+      }
+    }
+
     final graph = graphForFloor(floor);
+
+    // Fallback anchors to ensure we always return something usable
     final startPoint = {'fx': startRoom.fx ?? 0.5, 'fy': startRoom.fy ?? 0.5};
     final endPoint = {'fx': endRoom.fx ?? 0.5, 'fy': endRoom.fy ?? 0.5};
 
-    if (graph == null) {
-      // fallback straight line
+    if (graph == null || graph.nodes.isEmpty) {
       return [startPoint, endPoint];
     }
 
-    // Try to parse nodes from graph (for common shapes)
-    Map<String, Map<String, double>> nodesPos = {};
-    final Map<String, Map<String, double>> neighbors = {};
-
-    try {
-      // Use graph.nodes directly (avoid dead null-aware fallback)
-      final rawNodes = (graph.nodes) as Iterable<dynamic>? ?? [];
-      for (final rn in rawNodes) {
-        if (rn is Map) {
-          final id = rn['id']?.toString();
-          double? fx = (rn['fx'] ?? rn['x'] ?? rn['px']) is num
-              ? (rn['fx'] ?? rn['x'] ?? rn['px']).toDouble()
-              : null;
-          double? fy = (rn['fy'] ?? rn['y'] ?? rn['py']) is num
-              ? (rn['fy'] ?? rn['y'] ?? rn['py']).toDouble()
-              : null;
-
-          if (fx != null && fy != null && id != null && id.isNotEmpty) {
-            nodesPos[id] = {'fx': fx, 'fy': fy};
-          }
-
-          // neighbors parsing
-          final rawNeigh =
-              (rn['neighbors'] ?? rn['edges'] ?? rn['adj'])
-                  as Iterable<dynamic>? ??
-              [];
-          final mapNeigh = <String, double>{};
-          for (final e in rawNeigh) {
-            if (e is Map) {
-              final to = e['to']?.toString() ?? e['id']?.toString();
-              double cost = 1.0;
-              if (e['cost'] is num) cost = (e['cost'] as num).toDouble();
-              if (to != null) mapNeigh[to] = cost;
-            } else if (e is List && e.isNotEmpty) {
-              final to = e[0]?.toString();
-              final cost = (e.length > 1 && e[1] is num)
-                  ? (e[1] as num).toDouble()
-                  : 1.0;
-              if (to != null) mapNeigh[to] = cost;
-            }
-          }
-          if (id != null && mapNeigh.isNotEmpty) neighbors[id] = mapNeigh;
-        }
-      }
-    } catch (_) {
-      // permissive: continue to fallback
+    // Build adjacency from graph edges (edges may already be bidirectional in JSON)
+    final Map<String, Map<String, double>> adj = {};
+    void addEdge(String from, String to, double c) {
+      adj.putIfAbsent(from, () => {});
+      adj[from]![to] = c;
     }
 
-    // If we couldn't parse nodes (empty), fallback:
-    if (nodesPos.isEmpty) {
-      return [startPoint, endPoint];
-    }
-
-    // If neighbors empty, auto-connect via k-nearest approach
-    Map<String, Map<String, double>> adj = {};
-    if (neighbors.isNotEmpty) {
-      adj = neighbors;
-    } else {
-      // build k-nearest adjacency (k=6)
-      final ids = nodesPos.keys.toList();
-      for (final id in ids) {
-        final p = nodesPos[id]!;
-        final dists = <String, double>{};
-        for (final other in ids) {
-          if (other == id) continue;
-          final q = nodesPos[other]!;
-          final dx = p['fx']! - q['fx']!;
-          final dy = p['fy']! - q['fy']!;
-          final dist = math.sqrt(dx * dx + dy * dy);
-          dists[other] = dist;
-        }
-        final sorted = dists.entries.toList()
-          ..sort((a, b) => a.value.compareTo(b.value));
-        final k = math.min(6, sorted.length);
-        final neigh = <String, double>{};
-        for (int i = 0; i < k; i++) {
-          neigh[sorted[i].key] = sorted[i].value;
-        }
-        adj[id] = neigh;
+    for (final e in graph.edges) {
+      // Trust cost provided; models already compute Euclidean as default
+      addEdge(e.from, e.to, e.cost);
+      // Ensure graph is navigable even if JSON forgot the reverse edge
+      if ((adj[e.to] == null) || (adj[e.to]![e.from] == null)) {
+        addEdge(e.to, e.from, e.cost);
       }
     }
 
-    // helper: nearest node id to a fractional point
-    String nearestNode(
-      Map<String, Map<String, double>> nodes,
-      Map<String, double> pt,
-    ) {
-      String best = nodes.keys.first;
-      double bestD = double.infinity;
-      for (final k in nodes.keys) {
-        final n = nodes[k]!;
-        final dx = n['fx']! - pt['fx']!;
-        final dy = n['fy']! - pt['fy']!;
-        final d = dx * dx + dy * dy;
-        if (d < bestD) {
-          bestD = d;
+    // Positions map for quick math
+    final Map<String, Map<String, double>> nodesPos = {
+      for (final entry in graph.nodes.entries)
+        entry.key: {'fx': entry.value.fx, 'fy': entry.value.fy},
+    };
+
+    // Choose best graph-attachment nodes for both rooms:
+    // 1) Use explicit door mapping by room name or id when available
+    // 2) Otherwise, pick nearest graph node to the room's fx/fy
+    String _nearestNodeToPoint(double fx, double fy) {
+      String best = nodesPos.keys.first;
+      var bestD = double.infinity;
+      for (final k in nodesPos.keys) {
+        final n = nodesPos[k]!;
+        final dx = n['fx']! - fx;
+        final dy = n['fy']! - fy;
+        final d2 = dx * dx + dy * dy;
+        if (d2 < bestD) {
+          bestD = d2;
           best = k;
         }
       }
       return best;
     }
 
-    final startNode = nearestNode(nodesPos, startPoint);
-    final endNode = nearestNode(nodesPos, endPoint);
-
-    // A* implementation
-    List<String> reconstructPath(Map<String, String> cameFrom, String current) {
-      final path = <String>[];
-      var c = current;
-      while (c.isNotEmpty) {
-        path.insert(0, c);
-        if (!cameFrom.containsKey(c)) break;
-        c = cameFrom[c]!;
-      }
-      return path;
+    String? _doorForRoom(Room r) {
+      // Try exact name, then id, then some friendly fallbacks
+      final byName = graph.roomToDoorNode[r.name];
+      if (byName != null) return byName;
+      final byId = graph.roomToDoorNode[r.id];
+      if (byId != null) return byId;
+      return null;
     }
 
+    final startAttach =
+        _doorForRoom(startRoom) ??
+        _nearestNodeToPoint(startPoint['fx']!, startPoint['fy']!);
+    final endAttach =
+        _doorForRoom(endRoom) ??
+        _nearestNodeToPoint(endPoint['fx']!, endPoint['fy']!);
+
+    // A* search over the directed adjacency
     final nodeIds = nodesPos.keys.toList();
     final gScore = <String, double>{
       for (final n in nodeIds) n: double.infinity,
@@ -336,55 +345,66 @@ class CampusProvider with ChangeNotifier {
       for (final n in nodeIds) n: double.infinity,
     };
     final cameFrom = <String, String>{};
-    final open = <String>{startNode};
+    final open = <String>{startAttach};
 
-    gScore[startNode] = 0.0;
-    final hx = nodesPos[startNode]!['fx']! - nodesPos[endNode]!['fx']!;
-    final hy = nodesPos[startNode]!['fy']! - nodesPos[endNode]!['fy']!;
-    fScore[startNode] = math.sqrt(hx * hx + hy * hy);
+    gScore[startAttach] = 0.0;
+    double _heur(String a, String b) {
+      final ax = nodesPos[a]!['fx']!, ay = nodesPos[a]!['fy']!;
+      final bx = nodesPos[b]!['fx']!, by = nodesPos[b]!['fy']!;
+      final dx = ax - bx, dy = ay - by;
+      return math.sqrt(dx * dx + dy * dy);
+    }
+
+    fScore[startAttach] = _heur(startAttach, endAttach);
 
     String? current;
     while (open.isNotEmpty) {
-      // node in open with lowest fScore
       current = open.reduce((a, b) => fScore[a]! < fScore[b]! ? a : b);
-
-      if (current == endNode) {
-        final idPath = reconstructPath(cameFrom, current);
-        // convert to fractional points
-        final out = <Map<String, double>>[];
-        for (final nid in idPath) {
-          final n = nodesPos[nid];
-          if (n != null) out.add({'fx': n['fx']!, 'fy': n['fy']!});
+      if (current == endAttach) {
+        // reconstruct
+        final pathIds = <String>[];
+        var c = current;
+        while (true) {
+          pathIds.insert(0, c);
+          if (!cameFrom.containsKey(c)) break;
+          c = cameFrom[c]!;
         }
-        // anchor start & end exactly to room points
-        if (out.isNotEmpty) {
-          out.first['fx'] = startPoint['fx']!;
-          out.first['fy'] = startPoint['fy']!;
-          out[out.length - 1]['fx'] = endPoint['fx']!;
-          out[out.length - 1]['fy'] = endPoint['fy']!;
+        // convert to points and anchor exact room points at ends
+        final pts = <Map<String, double>>[];
+        // Start anchor at the real room position, then path along corridor
+        pts.add({'fx': startPoint['fx']!, 'fy': startPoint['fy']!});
+        for (final id in pathIds) {
+          final n = nodesPos[id]!;
+          pts.add({'fx': n['fx']!, 'fy': n['fy']!});
         }
-        return out;
+        pts.add({'fx': endPoint['fx']!, 'fy': endPoint['fy']!});
+        return pts;
       }
-
       open.remove(current);
-      final neigh = adj[current] ?? {};
-      for (final ent in neigh.entries) {
-        final nbId = ent.key;
-        final cost = ent.value;
-        final tentativeG = gScore[current]! + cost;
-        if (tentativeG < (gScore[nbId] ?? double.infinity)) {
-          cameFrom[nbId] = current;
-          gScore[nbId] = tentativeG;
-          final hx2 = nodesPos[nbId]!['fx']! - nodesPos[endNode]!['fx']!;
-          final hy2 = nodesPos[nbId]!['fy']! - nodesPos[endNode]!['fy']!;
-          fScore[nbId] = tentativeG + math.sqrt(hx2 * hx2 + hy2 * hy2);
-          if (!open.contains(nbId)) open.add(nbId);
+      final neigh = adj[current] ?? const <String, double>{};
+      for (final entry in neigh.entries) {
+        final nb = entry.key;
+        final cost = entry.value;
+        final tentative = gScore[current]! + cost;
+        if (tentative < (gScore[nb] ?? double.infinity)) {
+          cameFrom[nb] = current;
+          gScore[nb] = tentative;
+          fScore[nb] = tentative + _heur(nb, endAttach);
+          open.add(nb);
         }
       }
     }
 
-    // If we reach here, no path found; fallback straight
-    return [startPoint, endPoint];
+    // No corridor path found; try a minimal composed path via the nearest
+    // corridor attachments to avoid a misleading giant diagonal.
+    final fallback = <Map<String, double>>[];
+    fallback.add({'fx': startPoint['fx']!, 'fy': startPoint['fy']!});
+    final sa = nodesPos[startAttach];
+    if (sa != null) fallback.add({'fx': sa['fx']!, 'fy': sa['fy']!});
+    final ea = nodesPos[endAttach];
+    if (ea != null) fallback.add({'fx': ea['fx']!, 'fy': ea['fy']!});
+    fallback.add({'fx': endPoint['fx']!, 'fy': endPoint['fy']!});
+    return fallback;
   }
 
   // --------- CRUD for schedules ---------
