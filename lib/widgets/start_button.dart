@@ -8,8 +8,8 @@ class StartButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton.icon(
       icon: const Icon(Icons.navigation),
-      label: const Text('Start'),
-      onPressed: () => Navigator.pushNamed(context, AppRoutes.map),
+      label: const Text('Navigate to CCA Campus Map'),
+      onPressed: () => Navigator.pushNamed(context, AppRoutes.mapSelection),
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       ),

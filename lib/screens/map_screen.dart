@@ -43,6 +43,13 @@ class _MapScreenState extends State<MapScreen> {
             title: const Text('Campus Map'),
             actions: [
               IconButton(
+                tooltip: '2D Campus Map',
+                icon: const Icon(Icons.map),
+                onPressed: () {
+                  Navigator.pushNamed(context, '/map2d');
+                },
+              ),
+              IconButton(
                 tooltip: 'Clear Highlight',
                 icon: const Icon(Icons.layers_clear),
                 onPressed: () => provider.selectRoom(null),
@@ -53,11 +60,7 @@ class _MapScreenState extends State<MapScreen> {
             mapController: _mapController,
             options: MapOptions(initialCenter: center, initialZoom: 18),
             children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
-              ),
+              // OSM tile layer removed - using 2D campus map instead
               MarkerLayer(
                 markers: rooms.map((r) {
                   final selected = (provider.selectedRoomId == r.id);

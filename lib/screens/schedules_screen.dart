@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
 import '../core/routes.dart';
 import '../models/schedule.dart';
+import 'floor_map_screen.dart';
 
 class SchedulesScreen extends StatefulWidget {
   const SchedulesScreen({super.key});
@@ -193,8 +194,8 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                   onTap: () {
                                     if (room != null) {
                                       provider.selectRoom(room.id);
+                                      _navigateToFloorMap(context, room.floor);
                                     }
-                                    Navigator.pushNamed(context, AppRoutes.map);
                                   },
                                 );
                               }),
@@ -388,7 +389,9 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                             onPressed: () {
                               if (room != null) provider.selectRoom(room.id);
                               Navigator.of(ctx).pop(); // close sheet
-                              Navigator.pushNamed(context, AppRoutes.map);
+                              if (room != null) {
+                                _navigateToFloorMap(context, room.floor);
+                              }
                             },
                           ),
                         );
@@ -614,11 +617,38 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
     if (parts.length >= 2) return '${parts[0]} ${parts[1]}';
     return name;
   }
+
+  void _navigateToFloorMap(BuildContext context, int? floor) {
+    if (floor == null) {
+      // If no floor info, show map selection screen
+      Navigator.pushNamed(context, AppRoutes.mapSelection);
+      return;
+    }
+
+    // Navigate to specific floor map
+    switch (floor) {
+      case 1:
+        Navigator.pushNamed(context, AppRoutes.floor1);
+        break;
+      case 2:
+        Navigator.pushNamed(context, AppRoutes.floor2);
+        break;
+      case 3:
+        Navigator.pushNamed(context, AppRoutes.floor3);
+        break;
+      case 4:
+        Navigator.pushNamed(context, AppRoutes.floor4);
+        break;
+      default:
+        // Fallback to map selection if floor is not recognized
+        Navigator.pushNamed(context, AppRoutes.mapSelection);
+    }
+  }
 }
 
 // ---------------- A simple full-screen instructor detail page ----------------
 
-class InstructorDetailScreen extends StatelessWidget {
+class InstructorDetailScreen extends StatefulWidget {
   final String instructor;
   final CampusProvider provider;
   const InstructorDetailScreen({
@@ -628,11 +658,19 @@ class InstructorDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<InstructorDetailScreen> createState() => _InstructorDetailScreenState();
+}
+
+class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
+  String? _selectedStartRoomId;
+  String? _selectedDestinationRoomId;
+
+  @override
   Widget build(BuildContext context) {
-    final schedules = provider.schedulesForInstructor(instructor)
+    final schedules = widget.provider.schedulesForInstructor(widget.instructor)
       ..sort((a, b) => a.start.compareTo(b.start));
     final fmt = DateFormat('h:mm a');
-    final photoUrl = provider.photoForInstructor(instructor);
+    final photoUrl = widget.provider.photoForInstructor(widget.instructor);
 
     final ImageProvider? imgProvider = (photoUrl != null && photoUrl.isNotEmpty)
         ? (photoUrl.startsWith('assets/')
@@ -641,7 +679,7 @@ class InstructorDetailScreen extends StatelessWidget {
         : null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(instructor)),
+      appBar: AppBar(title: Text(widget.instructor)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -655,12 +693,102 @@ class InstructorDetailScreen extends StatelessWidget {
             else
               CircleAvatar(
                 radius: 44,
-                child: Text(instructor.substring(0, 1).toUpperCase()),
+                child: Text(widget.instructor.substring(0, 1).toUpperCase()),
               ),
             const SizedBox(height: 12),
             Text(
-              instructor,
+              widget.instructor,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            // Navigation helper card
+            Card(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.navigation,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Do you want to locate this professor\'s room?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'If yes, kindly choose your current location by clicking the Start button',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.room),
+                            label: Text(
+                              _selectedStartRoomId == null
+                                  ? 'Choose Start Location'
+                                  : widget.provider
+                                            .roomById(_selectedStartRoomId!)
+                                            ?.name ??
+                                        'Start',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () => _selectStartLocation(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.directions),
+                          label: const Text('Go'),
+                          onPressed:
+                              _selectedStartRoomId == null ||
+                                  _selectedDestinationRoomId == null
+                              ? null
+                              : () => _navigateToRoomWithPath(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -671,10 +799,19 @@ class InstructorDetailScreen extends StatelessWidget {
                       separatorBuilder: (_, __) => const Divider(),
                       itemBuilder: (_, i) {
                         final s = schedules[i];
-                        final room = provider.roomById(s.roomId);
+                        final room = widget.provider.roomById(s.roomId);
                         final roomName = room?.name ?? s.roomId;
-                        final roomThumb = provider.roomThumbnail(s.roomId);
+                        final roomThumb = widget.provider.roomThumbnail(
+                          s.roomId,
+                        );
+                        final isSelected =
+                            _selectedDestinationRoomId == s.roomId;
+
                         return ListTile(
+                          selected: isSelected,
+                          selectedTileColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer.withOpacity(0.3),
                           leading: roomThumb != null
                               ? SizedBox(
                                   width: 64,
@@ -702,15 +839,178 @@ class InstructorDetailScreen extends StatelessWidget {
                             '${fmt.format(s.start)} – ${fmt.format(s.end)}\nRoom: $roomName',
                           ),
                           isThreeLine: true,
+                          trailing: isSelected
+                              ? Icon(
+                                  Icons.check_circle,
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
+                              : null,
                           onTap: () {
-                            if (room != null) provider.selectRoom(room.id);
-                            Navigator.pushNamed(context, AppRoutes.map);
+                            setState(() {
+                              _selectedDestinationRoomId = s.roomId;
+                            });
                           },
                         );
                       },
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _selectStartLocation(BuildContext context) {
+    final room = widget.provider.roomById(_selectedDestinationRoomId ?? '');
+    if (room == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select a destination room first by tapping on a schedule.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Get all rooms on the same floor as the destination, excluding waypoints
+    final roomsOnFloor =
+        widget.provider.rooms
+            .where((r) => r.floor == room.floor && r.type != 'waypoint')
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Your Current Location'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: roomsOnFloor.isEmpty
+              ? const Text('No rooms available on this floor.')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: roomsOnFloor.length,
+                  itemBuilder: (_, i) {
+                    final r = roomsOnFloor[i];
+                    final isSelected = _selectedStartRoomId == r.id;
+                    return ListTile(
+                      selected: isSelected,
+                      leading: Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      title: Text(r.name),
+                      subtitle: Text('Floor ${r.floor}'),
+                      onTap: () {
+                        setState(() {
+                          _selectedStartRoomId = r.id;
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToRoomWithPath(BuildContext context) {
+    if (_selectedStartRoomId == null || _selectedDestinationRoomId == null) {
+      return;
+    }
+
+    final startRoom = widget.provider.roomById(_selectedStartRoomId!);
+    final destRoom = widget.provider.roomById(_selectedDestinationRoomId!);
+
+    if (startRoom == null || destRoom == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to find selected rooms.')),
+      );
+      return;
+    }
+
+    if (startRoom.floor != destRoom.floor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Start (Floor ${startRoom.floor}) and destination (Floor ${destRoom.floor}) are on different floors. Please select rooms on the same floor.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (destRoom.floor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Destination room has no floor information.'),
+        ),
+      );
+      return;
+    }
+
+    // Navigate to the floor map with start and destination pre-selected
+    Navigator.of(context).pop(); // Close instructor detail screen
+    _navigateToFloorMapWithPath(
+      context,
+      destRoom.floor!,
+      _selectedStartRoomId!,
+      _selectedDestinationRoomId!,
+    );
+  }
+
+  void _navigateToFloorMapWithPath(
+    BuildContext context,
+    int floor,
+    String startRoomId,
+    String destRoomId,
+  ) {
+    String floorTitle;
+    String imagePath;
+
+    switch (floor) {
+      case 1:
+        floorTitle = 'Ground Floor';
+        imagePath = 'assets/images/1ST FLOOR.jpg';
+        break;
+      case 2:
+        floorTitle = '2nd Floor: Main Building';
+        imagePath = 'assets/images/2ND FLOOR.jpg';
+        break;
+      case 3:
+        floorTitle = '3rd Floor';
+        imagePath = 'assets/images/3RD FLOOR.jpg';
+        break;
+      case 4:
+        floorTitle = '4th Floor';
+        imagePath = 'assets/images/4TH FLOOR.jpg';
+        break;
+      default:
+        Navigator.pushNamed(context, AppRoutes.mapSelection);
+        return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FloorMapScreen(
+          floorNumber: floor,
+          floorTitle: floorTitle,
+          imagePath: imagePath,
+          initialStartRoomId: startRoomId,
+          initialDestinationRoomId: destRoomId,
         ),
       ),
     );

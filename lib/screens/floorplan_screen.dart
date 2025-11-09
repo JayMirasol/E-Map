@@ -25,7 +25,7 @@ class FloorplanScreen extends StatelessWidget {
           length: floors.length,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('CCA Floorplan'),
+              title: const Text('ICSLIS Floorplan'),
               bottom: TabBar(
                 isScrollable: false,
                 tabs: floors.map((f) => Tab(text: '${f}F')).toList(),

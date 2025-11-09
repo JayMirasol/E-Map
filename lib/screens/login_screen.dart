@@ -16,8 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
-  static const String _adminUsername = 'a';
-  static const String _adminPassword = 'p';
+  static const String _adminUsername = 'adminEmap';
+  static const String _adminPassword = 'adminEmap2025!';
 
   @override
   void dispose() {
