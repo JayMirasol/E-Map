@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'floor_map_screen.dart';
 
 class MapSelectionScreen extends StatelessWidget {
   const MapSelectionScreen({super.key});
@@ -13,6 +14,34 @@ class MapSelectionScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            color: Colors.green[50],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.directions, color: Colors.green),
+              title: const Text(
+                'Quick demo: Route from BFO (1F) to MISSO (2F)',
+              ),
+              subtitle: const Text('Shows cross-floor navigation with stairs'),
+              trailing: const Icon(Icons.play_arrow),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const FloorMapScreen(
+                      floorNumber: 1,
+                      floorTitle: 'Ground Floor',
+                      imagePath: 'assets/images/1ST FLOOR.jpg',
+                      initialStartRoomId: 'BFO',
+                      initialDestinationRoomId: 'MISSO',
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: Text(

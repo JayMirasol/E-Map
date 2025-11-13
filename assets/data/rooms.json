@@ -17,7 +17,7 @@
   {"id":"SCIENCE_LABORATORY","name":"SCIENCE LABORATORY","type":"lab","floor":1,"lat":15.14715,"lng":120.58745,"fx":0.802,"fy":0.396,"waypoints":["waypoint_1f_sciencelab_2"]},
   {"id":"CANTEEN","name":"CANTEEN","type":"office","floor":1,"lat":15.14715,"lng":120.58745,"fx":0.799,"fy":0.079,"waypoints":["waypoint_1f_canteen_hall"]},
 
-  {"id":"MISSO","name":"MISSO","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"MISSO","name":"MISSO","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":0.338,"fy":0.935},
   {"id":"FACULTY_ROOM","name":"FACULTY ROOM","type":"faculty","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"CLAB1","name":"CLAB1","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"CLAB2","name":"CLAB2","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
@@ -28,7 +28,7 @@
   {"id":"STORAGE_ROOM","name":"STORAGE ROOM","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"COMFORT_ROOM_2F","name":"COMFORT ROOM","type":"office","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 
-  {"id":"R201","name":"R201","type":"classroom","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
+  {"id":"R201","name":"R201","type":"classroom","floor":2,"lat":15.14715,"lng":120.58745,"fx":0.677,"fy":0.926},
   {"id":"R202","name":"R202","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
   {"id":"R203","name":"R203","type":"lab","floor":2,"lat":15.14715,"lng":120.58745,"fx":null,"fy":null},
 

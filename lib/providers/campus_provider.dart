@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../models/room.dart';
 import '../models/schedule.dart';
 import '../models/floor_graph.dart';
+import '../core/pathfinding.dart';
+import 'package:flutter/material.dart';
 import '../services/local_store.dart';
 
 class CampusProvider with ChangeNotifier {
@@ -29,6 +31,11 @@ class CampusProvider with ChangeNotifier {
   // Admin-controlled path overrides loaded from assets/data/path_overrides.json
   // Shape: { "4": { "L406->R405": ["L403", "R403"] } }
   final Map<int, Map<String, List<String>>> _pathOverrides = {};
+  Map<String, dynamic> _manualRoutes = {};
+  // In-progress manual route draft shared across floors/screens
+  String? _draftStartId;
+  String? _draftEndId;
+  final Map<int, List<Map<String, double>>> _manualDraftByFloor = {};
 
   Future<void> load() async {
     // Rooms still from assets for now
@@ -65,6 +72,7 @@ class CampusProvider with ChangeNotifier {
     notifyListeners();
     await _loadGraphs();
     await _loadPathOverrides();
+    await _loadManualRoutes();
   }
 
   Future<void> _loadGraphs() async {
@@ -78,6 +86,138 @@ class CampusProvider with ChangeNotifier {
         // If file missing, skip; auto-routing just won’t be available for that floor
       }
     }
+  }
+
+  Future<void> _loadManualRoutes() async {
+    try {
+      _manualRoutes = await LocalStore.readManualRoutes();
+    } catch (_) {
+      _manualRoutes = {};
+    }
+    if (kDebugMode) {
+      debugPrint('Manual routes loaded: ${_manualRoutes.keys.length} keys');
+    }
+  }
+
+  Future<void> saveManualRoute(
+    String startRoomId,
+    String endRoomId,
+    List<Map<String, dynamic>> segments,
+  ) async {
+    // Save each floor segment separately with floor-specific keys
+    for (final seg in segments) {
+      final floor = seg['floor'] as int;
+      final pts = seg['points'] as List;
+      final key = '$floor:$startRoomId->$endRoomId';
+      _manualRoutes[key] = [seg]; // Store as single-floor segment
+
+      // Also store reverse for convenience
+      final revPts = pts.reversed.toList();
+      final revKey = '$floor:$endRoomId->$startRoomId';
+      _manualRoutes[revKey] = [
+        {'floor': floor, 'points': revPts},
+      ];
+    }
+
+    await LocalStore.writeManualRoutes(_manualRoutes);
+    notifyListeners();
+  }
+
+  // -------- Manual route draft API (for cross-floor editing) --------
+
+  void beginManualRoute(String startRoomId, String endRoomId) {
+    if (_draftStartId == startRoomId && _draftEndId == endRoomId) return;
+    _draftStartId = startRoomId;
+    _draftEndId = endRoomId;
+    _manualDraftByFloor.clear();
+    notifyListeners();
+  }
+
+  void addManualDraftPoint(int floor, double fx, double fy) {
+    if (_draftStartId == null || _draftEndId == null) return;
+    final list = _manualDraftByFloor.putIfAbsent(
+      floor,
+      () => <Map<String, double>>[],
+    );
+    list.add({'fx': fx, 'fy': fy});
+    notifyListeners();
+  }
+
+  void undoManualDraftPoint(int floor) {
+    final list = _manualDraftByFloor[floor];
+    if (list != null && list.isNotEmpty) {
+      list.removeLast();
+      notifyListeners();
+    }
+  }
+
+  void clearManualDraftFloor(int floor) {
+    _manualDraftByFloor.remove(floor);
+    notifyListeners();
+  }
+
+  /// Delete a saved manual route for a specific floor
+  Future<void> deleteManualRouteForFloor(
+    String startRoomId,
+    String endRoomId,
+    int floor,
+  ) async {
+    final key = '$floor:$startRoomId->$endRoomId';
+    final revKey = '$floor:$endRoomId->$startRoomId';
+    _manualRoutes.remove(key);
+    _manualRoutes.remove(revKey);
+    await LocalStore.writeManualRoutes(_manualRoutes);
+    notifyListeners();
+  }
+
+  /// Check if a manual route exists for a specific floor
+  bool hasManualRouteForFloor(String startRoomId, String endRoomId, int floor) {
+    final key = '$floor:$startRoomId->$endRoomId';
+    return _manualRoutes.containsKey(key);
+  }
+
+  List<Map<String, double>> draftPointsForFloor(int floor) {
+    return List<Map<String, double>>.from(
+      _manualDraftByFloor[floor] ?? const [],
+    );
+  }
+
+  bool get hasDraft =>
+      _draftStartId != null &&
+      _draftEndId != null &&
+      _manualDraftByFloor.isNotEmpty;
+
+  Future<void> saveManualDraft() async {
+    if (!hasDraft) return;
+    final startId = _draftStartId!;
+    final endId = _draftEndId!;
+    final sr = roomById(startId);
+    final er = roomById(endId);
+    if (sr == null || er == null) return;
+
+    // Order floors according to direction: start floor first, then others
+    final floors = _manualDraftByFloor.keys.toSet();
+    final ordered = <int>[];
+    if (sr.floor != null && floors.contains(sr.floor)) ordered.add(sr.floor!);
+    for (final f in floors) {
+      if (!ordered.contains(f)) ordered.add(f);
+    }
+
+    final segments = <Map<String, dynamic>>[];
+    for (final f in ordered) {
+      final pts = _manualDraftByFloor[f];
+      if (pts == null || pts.length < 2) continue;
+      segments.add({'floor': f, 'points': List<Map<String, double>>.from(pts)});
+    }
+    if (segments.isEmpty) return;
+
+    await saveManualRoute(startId, endId, segments);
+
+    // Clear draft after save
+    _draftStartId = null;
+    _draftEndId = null;
+    _manualDraftByFloor.clear();
+    notifyListeners();
   }
 
   Future<void> _loadPathOverrides() async {
@@ -405,6 +545,224 @@ class CampusProvider with ChangeNotifier {
     if (ea != null) fallback.add({'fx': ea['fx']!, 'fy': ea['fy']!});
     fallback.add({'fx': endPoint['fx']!, 'fy': endPoint['fy']!});
     return fallback;
+  }
+
+  // ---------- Cross-floor routing (stairs/elevators) ----------
+
+  /// Compute a cross-floor route from startRoomId to endRoomId.
+  /// Returns an ordered list of floor-segment polylines where each segment
+  /// contains fractional points (fx, fy) normalized to the corresponding
+  /// floor image coordinate space.
+  ///
+  /// segments: [ { 'floor': 1, 'points': [ {'fx':..,'fy':..}, ... ] }, ... ]
+  Future<List<Map<String, dynamic>>> computeCrossFloorRoute(
+    String startRoomId,
+    String endRoomId, {
+    double verticalPenalty = 0.15,
+  }) async {
+    final startRoom = roomById(startRoomId);
+    final endRoom = roomById(endRoomId);
+    if (startRoom == null || endRoom == null) return [];
+
+    final sf = startRoom.floor;
+    final ef = endRoom.floor;
+    if (sf == null || ef == null) return [];
+
+    // Check for floor-specific manual routes
+    final segments = <Map<String, dynamic>>[];
+
+    // Determine which floors are involved
+    final minFloor = math.min(sf, ef);
+    final maxFloor = math.max(sf, ef);
+    final floorsInRoute = List<int>.generate(
+      maxFloor - minFloor + 1,
+      (i) => minFloor + i,
+    );
+
+    // Try to find manual routes for each floor
+    bool foundAllManualRoutes = true;
+    for (final floor in floorsInRoute) {
+      final floorKey = '$floor:$startRoomId->$endRoomId';
+      final manual = _manualRoutes[floorKey];
+
+      if (manual is List && manual.isNotEmpty) {
+        // Add this floor's manual segment
+        final seg = manual.first as Map;
+        segments.add({
+          'floor': seg['floor'],
+          'points': (seg['points'] as List)
+              .map(
+                (p) => {
+                  'fx': (p['fx'] as num).toDouble(),
+                  'fy': (p['fy'] as num).toDouble(),
+                },
+              )
+              .toList(),
+          'instruction': floor == sf
+              ? 'Follow path to connector'
+              : floor == ef
+              ? 'Follow path to ${endRoom.name}'
+              : 'Continue through floor $floor',
+          'connector': floor < maxFloor ? 'Stair_L' : null,
+        });
+      } else {
+        foundAllManualRoutes = false;
+        break;
+      }
+    }
+
+    if (foundAllManualRoutes && segments.isNotEmpty) {
+      return segments;
+    }
+
+    // Fall back to old non-floor-specific manual route (for backward compatibility)
+    final oldKey = '$startRoomId->$endRoomId';
+    final oldManual = _manualRoutes[oldKey];
+    if (oldManual is List) {
+      final cleaned = oldManual
+          .whereType<Map>()
+          .map(
+            (m) => {
+              'floor': m['floor'],
+              'points': (m['points'] as List)
+                  .map(
+                    (p) => {
+                      'fx': (p['fx'] as num).toDouble(),
+                      'fy': (p['fy'] as num).toDouble(),
+                    },
+                  )
+                  .toList(),
+            },
+          )
+          .toList();
+      if (cleaned.isNotEmpty) return cleaned;
+    }
+
+    // Same-floor: reuse single-floor router for best fidelity.
+    if (sf == ef) {
+      final pts = await findPathBetweenRooms(startRoomId, endRoomId);
+      return [
+        {
+          'floor': sf,
+          'points': pts,
+          'instruction':
+              'Proceed on Floor $sf from ${startRoom.name} to ${endRoom.name}',
+        },
+      ];
+    }
+
+    // Candidate vertical connectors that exist across floors (by common node id)
+    const connectorIds = ['Stair_L', 'Stair_R'];
+
+    // Helper: choose attach node for a room on a floor graph
+    String _attachNodeForRoom(FloorGraph g, Room r) {
+      // Prefer explicit door mapping by room name/id
+      final byName = g.roomToDoorNode[r.name];
+      if (byName != null && g.nodes.containsKey(byName)) return byName;
+      final byId = g.roomToDoorNode[r.id];
+      if (byId != null && g.nodes.containsKey(byId)) return byId;
+      // Fallback to nearest corridor/any node to room center
+      final fx = r.fx ?? 0.5, fy = r.fy ?? 0.5;
+      String? best;
+      var bestD = double.infinity;
+      g.nodes.forEach((id, n) {
+        final dx = n.fx - fx, dy = n.fy - fy;
+        final d2 = dx * dx + dy * dy;
+        if (d2 < bestD) {
+          bestD = d2;
+          best = id;
+        }
+      });
+      return best ?? g.nodes.keys.first;
+    }
+
+    // Helper: sum Euclidean length of a node-id path on a floor graph
+    double _pathCost(FloorGraph g, List<String> nodeIds) {
+      if (nodeIds.length < 2) return 0.0;
+      double sum = 0.0;
+      for (int i = 0; i < nodeIds.length - 1; i++) {
+        final a = g.nodes[nodeIds[i]]!;
+        final b = g.nodes[nodeIds[i + 1]]!;
+        final dx = a.fx - b.fx, dy = a.fy - b.fy;
+        sum += math.sqrt(dx * dx + dy * dy);
+      }
+      return sum;
+    }
+
+    // Try each connector and pick the cheapest viable route.
+    List<Map<String, dynamic>>? bestSegments;
+    double bestTotal = double.infinity;
+
+    for (final connectorId in connectorIds) {
+      // Ensure connector node exists on both floors involved (and any intermediate floors)
+      bool connectorsExist = true;
+      for (int f = math.min(sf, ef); f <= math.max(sf, ef); f++) {
+        final gf = _floorGraphs[f];
+        if (gf == null || !gf.nodes.containsKey(connectorId)) {
+          connectorsExist = false;
+          break;
+        }
+      }
+      if (!connectorsExist) continue;
+
+      final gStart = _floorGraphs[sf]!;
+      final gEnd = _floorGraphs[ef]!;
+
+      final startAttach = _attachNodeForRoom(gStart, startRoom);
+      final endAttach = _attachNodeForRoom(gEnd, endRoom);
+
+      final pathStart = Pathfinder.aStar(gStart, startAttach, connectorId);
+      if (pathStart.isEmpty) continue;
+      final pathEnd = Pathfinder.aStar(gEnd, connectorId, endAttach);
+      if (pathEnd.isEmpty) continue;
+
+      final cost =
+          _pathCost(gStart, pathStart) +
+          (verticalPenalty * (ef - sf).abs()) +
+          _pathCost(gEnd, pathEnd);
+
+      if (cost < bestTotal) {
+        bestTotal = cost;
+
+        // Build segments as polylines with anchors at real room centers
+        final segments = <Map<String, dynamic>>[];
+
+        // Start floor segment points
+        final startPts = <Map<String, double>>[];
+        startPts.add({'fx': startRoom.fx ?? 0.5, 'fy': startRoom.fy ?? 0.5});
+        for (final nid in pathStart) {
+          final n = gStart.nodes[nid]!;
+          startPts.add({'fx': n.fx, 'fy': n.fy});
+        }
+        segments.add({
+          'floor': sf,
+          'points': startPts,
+          'instruction': 'Go to $connectorId and take it to Floor $ef',
+          'connector': connectorId,
+        });
+
+        // End floor segment points
+        final endPts = <Map<String, double>>[];
+        // start at connector on end floor
+        final nConn = gEnd.nodes[connectorId]!;
+        endPts.add({'fx': nConn.fx, 'fy': nConn.fy});
+        for (final nid in pathEnd.skip(1)) {
+          final n = gEnd.nodes[nid]!;
+          endPts.add({'fx': n.fx, 'fy': n.fy});
+        }
+        endPts.add({'fx': endRoom.fx ?? 0.5, 'fy': endRoom.fy ?? 0.5});
+        segments.add({
+          'floor': ef,
+          'points': endPts,
+          'instruction': 'Proceed to ${endRoom.name}',
+          'connector': connectorId,
+        });
+
+        bestSegments = segments;
+      }
+    }
+
+    return bestSegments ?? [];
   }
 
   // --------- CRUD for schedules ---------
