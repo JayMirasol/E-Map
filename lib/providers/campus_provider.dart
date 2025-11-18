@@ -31,6 +31,9 @@ class CampusProvider with ChangeNotifier {
   // Admin-controlled path overrides loaded from assets/data/path_overrides.json
   // Shape: { "4": { "L406->R405": ["L403", "R403"] } }
   final Map<int, Map<String, List<String>>> _pathOverrides = {};
+  // Manual routes: loaded from assets (bundled) + local storage (newly created)
+  // Saved locally but can be exported to assets for Git sharing
+  // Shape: { "1:BFO->MISSO": [ {"floor":1, "points":[{"fx":...,"fy":...}]} ] }
   Map<String, dynamic> _manualRoutes = {};
   // In-progress manual route draft shared across floors/screens
   String? _draftStartId;
@@ -123,6 +126,24 @@ class CampusProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Get the file path where manual routes are saved locally.
+  /// This file can be copied to assets/data/manual_routes.json for Git sharing.
+  Future<String> getManualRoutesFilePath() async {
+    return await LocalStore.getManualRoutesPath();
+  }
+
+  /// Export manual routes to a publicly accessible location.
+  /// Returns the exported file path or null if failed.
+  Future<String?> exportManualRoutes() async {
+    return await LocalStore.exportManualRoutesToDownloads();
+  }
+
+  /// Get the JSON content of manual routes.
+  /// Use this to copy/share the content.
+  Future<String?> getManualRoutesContent() async {
+    return await LocalStore.getManualRoutesContent();
+  }
+
   // -------- Manual route draft API (for cross-floor editing) --------
 
   void beginManualRoute(String startRoomId, String endRoomId) {
@@ -174,6 +195,30 @@ class CampusProvider with ChangeNotifier {
   bool hasManualRouteForFloor(String startRoomId, String endRoomId, int floor) {
     final key = '$floor:$startRoomId->$endRoomId';
     return _manualRoutes.containsKey(key);
+  }
+
+  /// Check if manual routes exist for all floors between start and destination
+  bool hasCompleteManualRoute(String startRoomId, String endRoomId) {
+    final startRoom = roomById(startRoomId);
+    final endRoom = roomById(endRoomId);
+    if (startRoom == null || endRoom == null) return false;
+    if (startRoom.floor == null || endRoom.floor == null) return false;
+
+    final minFloor = startRoom.floor! < endRoom.floor!
+        ? startRoom.floor!
+        : endRoom.floor!;
+    final maxFloor = startRoom.floor! > endRoom.floor!
+        ? startRoom.floor!
+        : endRoom.floor!;
+
+    // Check all floors between start and end
+    for (int floor = minFloor; floor <= maxFloor; floor++) {
+      if (!hasManualRouteForFloor(startRoomId, endRoomId, floor)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   List<Map<String, double>> draftPointsForFloor(int floor) {
@@ -571,13 +616,20 @@ class CampusProvider with ChangeNotifier {
     // Check for floor-specific manual routes
     final segments = <Map<String, dynamic>>[];
 
-    // Determine which floors are involved
+    // Determine which floors are involved and their order based on direction
     final minFloor = math.min(sf, ef);
     final maxFloor = math.max(sf, ef);
-    final floorsInRoute = List<int>.generate(
-      maxFloor - minFloor + 1,
-      (i) => minFloor + i,
-    );
+
+    // Generate floors in the correct order (from start to end)
+    final floorsInRoute = sf <= ef
+        ? List<int>.generate(
+            maxFloor - minFloor + 1,
+            (i) => minFloor + i,
+          ) // Going up: [1,2,3]
+        : List<int>.generate(
+            maxFloor - minFloor + 1,
+            (i) => maxFloor - i,
+          ); // Going down: [3,2,1]
 
     // Try to find manual routes for each floor
     bool foundAllManualRoutes = true;
@@ -588,6 +640,7 @@ class CampusProvider with ChangeNotifier {
       if (manual is List && manual.isNotEmpty) {
         // Add this floor's manual segment
         final seg = manual.first as Map;
+        final isNotLastFloor = floor != ef;
         segments.add({
           'floor': seg['floor'],
           'points': (seg['points'] as List)
@@ -603,7 +656,7 @@ class CampusProvider with ChangeNotifier {
               : floor == ef
               ? 'Follow path to ${endRoom.name}'
               : 'Continue through floor $floor',
-          'connector': floor < maxFloor ? 'Stair_L' : null,
+          'connector': isNotLastFloor ? 'Stair_L' : null,
         });
       } else {
         foundAllManualRoutes = false;

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 class LocalStore {
   static const _fileName = 'schedules.json';
   static const _manualRoutesFileName = 'manual_routes.json';
+  static const _manualRoutesAssetPath = 'assets/data/manual_routes.json';
 
   static Future<File> _schedulesFile() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -39,24 +40,98 @@ class LocalStore {
     await f.writeAsString(txt, flush: true);
   }
 
-  // -------- Manual routes (saved locally, not in assets) --------
+  // -------- Manual routes (hybrid: read from assets + local storage) --------
 
-  /// Read manual route overrides from local storage.
-  /// Shape: { "BFO->MISSO": [ {"floor":1, "points":[{"fx":..,"fy":..}, ...]}, ... ] }
+  /// Read manual route overrides from both assets (bundled) and local storage (newly created).
+  /// Local routes override/supplement bundled routes.
+  /// Shape: { "1:BFO->MISSO": [ {"floor":1, "points":[{"fx":...,"fy":...}, ...]}, ... ] }
   static Future<Map<String, dynamic>> readManualRoutes() async {
-    final f = await _manualRoutesFile();
-    if (!await f.exists()) {
-      await f.writeAsString("{}", flush: true);
+    final result = <String, dynamic>{};
+
+    // First, load bundled routes from assets (if any)
+    try {
+      final assetText = await rootBundle.loadString(_manualRoutesAssetPath);
+      final assetData = jsonDecode(assetText);
+      if (assetData is Map<String, dynamic>) {
+        result.addAll(assetData);
+      }
+    } catch (_) {
+      // No bundled routes yet, that's ok
     }
-    final txt = await f.readAsString();
-    final raw = jsonDecode(txt);
-    if (raw is Map<String, dynamic>) return raw;
-    return <String, dynamic>{};
+
+    // Then, load and merge local routes (these override bundled ones)
+    try {
+      final f = await _manualRoutesFile();
+      if (await f.exists()) {
+        final localText = await f.readAsString();
+        final localData = jsonDecode(localText);
+        if (localData is Map<String, dynamic>) {
+          result.addAll(localData); // Local overrides bundled
+        }
+      }
+    } catch (_) {
+      // No local routes yet
+    }
+
+    return result;
   }
 
+  /// Write manual routes to local app storage.
+  /// NOTE: To share routes via Git, manually copy the file from device to:
+  ///       assets/data/manual_routes.json
+  /// On Android: /data/data/com.example.emap_mobile/app_flutter/manual_routes.json
+  /// Or use the exportManualRoutes() method to get the file path.
   static Future<void> writeManualRoutes(Map<String, dynamic> data) async {
     final f = await _manualRoutesFile();
     final txt = const JsonEncoder.withIndent('  ').convert(data);
     await f.writeAsString(txt, flush: true);
+    print('Manual routes saved to: ${f.path}');
+    print('To share via Git, copy this file to: $_manualRoutesAssetPath');
+  }
+
+  /// Get the local file path where manual routes are stored.
+  /// Use this to manually copy the file to assets for Git commit.
+  static Future<String> getManualRoutesPath() async {
+    final f = await _manualRoutesFile();
+    return f.path;
+  }
+
+  /// Export manual routes to Downloads folder for easy access.
+  /// Returns the path to the exported file.
+  static Future<String?> exportManualRoutesToDownloads() async {
+    try {
+      final sourceFile = await _manualRoutesFile();
+      if (!await sourceFile.exists()) {
+        return null;
+      }
+
+      // Get external storage directory (accessible via file manager)
+      final externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) return null;
+
+      // Copy to a publicly accessible location
+      final exportPath = '${externalDir.path}/manual_routes.json';
+
+      await sourceFile.copy(exportPath);
+      return exportPath;
+    } catch (e) {
+      print('Error exporting manual routes: $e');
+      return null;
+    }
+  }
+
+  /// Get the JSON content of manual routes as a string.
+  /// Use this to copy/paste the content.
+  static Future<String?> getManualRoutesContent() async {
+    try {
+      final f = await _manualRoutesFile();
+      if (!await f.exists()) {
+        return '{}';
+      }
+      return await f.readAsString();
+    } catch (e) {
+      print('Error reading manual routes: $e');
+      return null;
+    }
   }
 }

@@ -31,11 +31,53 @@ class AdminScreen extends StatelessWidget {
           });
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Admin — Schedules')),
-          floatingActionButton: FloatingActionButton.extended(
-            icon: const Icon(Icons.add),
-            label: const Text('Add Schedule'),
-            onPressed: () => _openScheduleForm(context),
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue[700]!, Colors.blue[500]!],
+                ),
+              ),
+            ),
+            title: const Text(
+              'Admin — Schedules',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 22,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          floatingActionButton: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue[700]!, Colors.blue[500]!],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              icon: const Icon(Icons.add_rounded, size: 24),
+              label: const Text(
+                'Add Schedule',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              onPressed: () => _openScheduleForm(context),
+            ),
           ),
           body: sorted.isEmpty
               ? const Center(
@@ -87,17 +129,77 @@ class AdminScreen extends StatelessWidget {
                             false;
                       },
                       onDismissed: (_) => p.deleteSchedule(s.id),
-                      child: ListTile(
-                        leading: const Icon(Icons.event_note),
-                        title: Text('${s.instructor} — ${s.subject}'),
-                        subtitle: Text(
-                          '$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () =>
-                              _openScheduleForm(context, existing: s),
-                          tooltip: 'Edit',
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey[200]!,
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue[100]!, Colors.blue[50]!],
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.event_note_rounded,
+                              color: Colors.blue[700],
+                              size: 24,
+                            ),
+                          ),
+                          title: Text(
+                            '${s.instructor} — ${s.subject}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                          trailing: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.edit_rounded,
+                                color: Colors.blue[700],
+                              ),
+                              onPressed: () =>
+                                  _openScheduleForm(context, existing: s),
+                              tooltip: 'Edit',
+                            ),
+                          ),
                         ),
                       ),
                     );

@@ -63,7 +63,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 
     // Initialize animation controllers
     _pathAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1500), // Increased duration
+      duration: const Duration(
+        milliseconds: 2000,
+      ), // Increased duration for slower animation
       vsync: this,
     );
 
@@ -75,7 +77,11 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     // Path drawing animation with delay
     _pathAnimation = CurvedAnimation(
       parent: _pathAnimationController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut), // 30% delay
+      curve: const Interval(
+        0.4,
+        1.0,
+        curve: Curves.easeInOut,
+      ), // 40% delay before drawing starts
     );
 
     // When path animation completes, auto-switch to next floor if needed
@@ -226,6 +232,32 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     });
   }
 
+  bool _areAllRequiredFloorsComplete(CampusProvider provider) {
+    if (_startRoomId == null || _destinationRoomId == null) return false;
+
+    final startRoom = provider.rooms.firstWhere((r) => r.id == _startRoomId);
+    final destRoom = provider.rooms.firstWhere(
+      (r) => r.id == _destinationRoomId,
+    );
+
+    final minFloor = startRoom.floor! < destRoom.floor!
+        ? startRoom.floor!
+        : destRoom.floor!;
+    final maxFloor = startRoom.floor! > destRoom.floor!
+        ? startRoom.floor!
+        : destRoom.floor!;
+
+    // Check if all floors between start and destination have paths
+    for (int f = minFloor; f <= maxFloor; f++) {
+      final points = provider.draftPointsForFloor(f);
+      if (points.isEmpty) {
+        return false; // Missing path for this floor
+      }
+    }
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
@@ -364,7 +396,10 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                     ),
                                     painter: PathLinePainter(
                                       pathPoints: scaled,
-                                      animationProgress: _pathAnimation.value,
+                                      animationProgress: _editMode
+                                          ? 1.0
+                                          : _pathAnimation
+                                                .value, // Always show full path in edit mode
                                     ),
                                   );
                                 },
@@ -895,6 +930,28 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                     ),
                                     OutlinedButton.icon(
                                       onPressed: () {
+                                        // Determine required floors for the route
+                                        final startRoom = provider.rooms
+                                            .firstWhere(
+                                              (r) => r.id == _startRoomId,
+                                            );
+                                        final destRoom = provider.rooms
+                                            .firstWhere(
+                                              (r) => r.id == _destinationRoomId,
+                                            );
+                                        final minFloor =
+                                            startRoom.floor! < destRoom.floor!
+                                            ? startRoom.floor!
+                                            : destRoom.floor!;
+                                        final maxFloor =
+                                            startRoom.floor! > destRoom.floor!
+                                            ? startRoom.floor!
+                                            : destRoom.floor!;
+                                        final requiredFloors = List.generate(
+                                          maxFloor - minFloor + 1,
+                                          (i) => minFloor + i,
+                                        );
+
                                         showModalBottomSheet(
                                           context: context,
                                           builder: (_) => SafeArea(
@@ -910,6 +967,15 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                   ),
                                                 ),
                                                 const SizedBox(height: 8),
+                                                Text(
+                                                  'Required floors: ${requiredFloors.join(", ")}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.blue,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
                                                 const Text(
                                                   'Your progress will be saved automatically',
                                                   style: TextStyle(
@@ -925,10 +991,17 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                   ) {
                                                     final points = provider
                                                         .draftPointsForFloor(f);
+                                                    final isRequired =
+                                                        requiredFloors.contains(
+                                                          f,
+                                                        );
+                                                    final isCurrent =
+                                                        f == widget.floorNumber;
+                                                    final hasPath =
+                                                        points.isNotEmpty;
+
                                                     return OutlinedButton(
-                                                      onPressed:
-                                                          f ==
-                                                              widget.floorNumber
+                                                      onPressed: isCurrent
                                                           ? null
                                                           : () {
                                                               Navigator.pop(
@@ -965,31 +1038,87 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                                 ),
                                                               );
                                                             },
-                                                      style: OutlinedButton.styleFrom(
-                                                        backgroundColor:
-                                                            f ==
-                                                                widget
-                                                                    .floorNumber
-                                                            ? Colors.grey[300]
-                                                            : points.isNotEmpty
-                                                            ? Colors.green[50]
-                                                            : null,
-                                                      ),
+                                                      style:
+                                                          OutlinedButton.styleFrom(
+                                                            backgroundColor:
+                                                                isCurrent
+                                                                ? Colors
+                                                                      .grey[300]
+                                                                : hasPath
+                                                                ? Colors
+                                                                      .green[100]
+                                                                : isRequired
+                                                                ? Colors
+                                                                      .orange[50]
+                                                                : Colors
+                                                                      .grey[50],
+                                                            side: BorderSide(
+                                                              color: isRequired
+                                                                  ? Colors
+                                                                        .orange
+                                                                  : Colors.grey,
+                                                              width: isRequired
+                                                                  ? 2
+                                                                  : 1,
+                                                            ),
+                                                          ),
                                                       child: Column(
                                                         mainAxisSize:
                                                             MainAxisSize.min,
                                                         children: [
-                                                          Text('Floor $f'),
-                                                          if (points.isNotEmpty)
-                                                            Text(
-                                                              '${points.length} pts',
-                                                              style:
-                                                                  const TextStyle(
+                                                          Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              if (isRequired)
+                                                                const Icon(
+                                                                  Icons.star,
+                                                                  size: 12,
+                                                                  color: Colors
+                                                                      .orange,
+                                                                ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                              Text('Floor $f'),
+                                                            ],
+                                                          ),
+                                                          if (hasPath)
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                const Icon(
+                                                                  Icons
+                                                                      .check_circle,
+                                                                  size: 10,
+                                                                  color: Colors
+                                                                      .green,
+                                                                ),
+                                                                const SizedBox(
+                                                                  width: 4,
+                                                                ),
+                                                                Text(
+                                                                  '${points.length} pts',
+                                                                  style: const TextStyle(
                                                                     fontSize:
                                                                         10,
                                                                     color: Colors
                                                                         .green,
                                                                   ),
+                                                                ),
+                                                              ],
+                                                            )
+                                                          else if (isRequired)
+                                                            const Text(
+                                                              'Required',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                color: Colors
+                                                                    .orange,
+                                                              ),
                                                             ),
                                                         ],
                                                       ),
@@ -1012,22 +1141,88 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                       onPressed:
                                           (_startRoomId != null &&
                                               _destinationRoomId != null &&
-                                              provider.hasDraft)
+                                              provider.hasDraft &&
+                                              _areAllRequiredFloorsComplete(
+                                                provider,
+                                              ))
                                           ? () async {
                                               final provider = context
                                                   .read<CampusProvider>();
                                               await provider.saveManualDraft();
+
                                               if (!mounted) return;
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Manual route saved! Each floor will use its custom path.',
+
+                                              // Show dialog with copy option
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text(
+                                                    'Manual Route Saved!',
                                                   ),
-                                                  backgroundColor: Colors.green,
+                                                  content: const Text(
+                                                    'Your manual route has been saved.\n\nWould you like to copy the JSON content to share it?',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                          ),
+                                                      child: const Text(
+                                                        'Close',
+                                                      ),
+                                                    ),
+                                                    ElevatedButton.icon(
+                                                      onPressed: () async {
+                                                        final content =
+                                                            await provider
+                                                                .getManualRoutesContent();
+                                                        if (content != null) {
+                                                          await Clipboard.setData(
+                                                            ClipboardData(
+                                                              text: content,
+                                                            ),
+                                                          );
+                                                          if (!context.mounted)
+                                                            return;
+                                                          Navigator.pop(
+                                                            context,
+                                                          );
+                                                          ScaffoldMessenger.of(
+                                                            context,
+                                                          ).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                'JSON copied to clipboard!\n\nPaste it into:\nassets/data/manual_routes.json',
+                                                              ),
+                                                              backgroundColor:
+                                                                  Colors.green,
+                                                              duration:
+                                                                  Duration(
+                                                                    seconds: 4,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        }
+                                                      },
+                                                      icon: const Icon(
+                                                        Icons.copy,
+                                                      ),
+                                                      label: const Text(
+                                                        'Copy JSON',
+                                                      ),
+                                                      style:
+                                                          ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                Colors.blue,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                          ),
+                                                    ),
+                                                  ],
                                                 ),
                                               );
+
                                               setState(() {
                                                 _editMode = false;
                                               });
@@ -1287,9 +1482,93 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       });
       context.read<CampusProvider>().selectRoom(selected);
 
-      // Trigger path animation
-      await _recomputeRoute();
-      _pathAnimationController.forward(from: 0.0);
+      // Check if start and destination are on different floors
+      final provider = context.read<CampusProvider>();
+      final startRoom = provider.rooms.firstWhere((r) => r.id == _startRoomId);
+      final destRoom = provider.rooms.firstWhere((r) => r.id == selected);
+
+      final isDifferentFloors = startRoom.floor != destRoom.floor;
+
+      // Check if a complete manual route already exists
+      final hasExistingRoute = provider.hasCompleteManualRoute(
+        _startRoomId!,
+        selected,
+      );
+
+      if (isDifferentFloors && !_editMode && !hasExistingRoute) {
+        // Cross-floor route detected and NO saved route exists - enable manual route mode
+        setState(() => _editMode = true);
+        provider.beginManualRoute(_startRoomId!, selected);
+
+        if (!mounted) return;
+
+        // Show guidance dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.edit_location, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Cross-Floor Route'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You\'ve selected rooms on different floors:\n\n'
+                  '• Start: ${startRoom.name} (Floor ${startRoom.floor})\n'
+                  '• Destination: ${destRoom.name} (Floor ${destRoom.floor})\n\n'
+                  'Manual Route mode is now active.',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '📍 Instructions:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '1. Long-press on Floor ${startRoom.floor} to draw the path\n'
+                        '2. Use "Switch floor" button to go to Floor ${destRoom.floor}\n'
+                        '3. Continue drawing the path on Floor ${destRoom.floor}\n'
+                        '4. Click "Save manual route" when done',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Got it!'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Same floor, already in edit mode, OR has existing saved route - proceed normally
+        await _recomputeRoute();
+        _pathAnimationController.forward(from: 0.0);
+      }
     }
   }
 
@@ -1409,7 +1688,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 }
 
 // Room selection dialog
-class _RoomSelectionDialog extends StatelessWidget {
+class _RoomSelectionDialog extends StatefulWidget {
   final List rooms;
   final String title;
   final int currentFloor;
@@ -1423,62 +1702,180 @@ class _RoomSelectionDialog extends StatelessWidget {
   });
 
   @override
+  State<_RoomSelectionDialog> createState() => _RoomSelectionDialogState();
+}
+
+class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Filter out waypoints - only show actual rooms to users
-    final selectableRooms = rooms.where((r) => r.type != 'waypoint').toList();
+    var selectableRooms = widget.rooms
+        .where((r) => r.type != 'waypoint')
+        .toList();
 
-    if (isStartSelection) {
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      selectableRooms = selectableRooms.where((r) {
+        final roomName = r.name.toLowerCase();
+        final roomType = r.type.toLowerCase();
+        final query = _searchQuery.toLowerCase();
+        return roomName.contains(query) || roomType.contains(query);
+      }).toList();
+    }
+
+    if (widget.isStartSelection) {
       // For start selection: only show current floor rooms, disable others
-      return AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            itemCount: selectableRooms.length,
-            itemBuilder: (context, index) {
-              final room = selectableRooms[index];
-              final isCurrentFloor = room.floor == currentFloor;
-              
-              return ListTile(
-                enabled: isCurrentFloor,
-                leading: CircleAvatar(
-                  backgroundColor: isCurrentFloor ? null : Colors.grey[300],
-                  child: Text(
-                    room.name.replaceAll(RegExp(r'[^0-9]'), ''),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isCurrentFloor ? null : Colors.grey[600],
+      return MediaQuery.removeViewInsets(
+        context: context,
+        removeBottom: true,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.title),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 350,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Results count
+                if (_searchQuery.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${selectableRooms.length} room(s) found',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
+                // Room list
+                Expanded(
+                  child: selectableRooms.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No rooms found',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: selectableRooms.length,
+                          itemBuilder: (context, index) {
+                            final room = selectableRooms[index];
+                            final isCurrentFloor =
+                                room.floor == widget.currentFloor;
+
+                            return ListTile(
+                              enabled: isCurrentFloor,
+                              leading: CircleAvatar(
+                                backgroundColor: isCurrentFloor
+                                    ? null
+                                    : Colors.grey[300],
+                                child: Text(
+                                  room.name.replaceAll(RegExp(r'[^0-9]'), ''),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isCurrentFloor
+                                        ? null
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                room.name,
+                                style: TextStyle(
+                                  color: isCurrentFloor
+                                      ? null
+                                      : Colors.grey[400],
+                                ),
+                              ),
+                              subtitle: Text(
+                                isCurrentFloor
+                                    ? room.type
+                                    : '${room.type} (Floor ${room.floor})',
+                                style: TextStyle(
+                                  color: isCurrentFloor
+                                      ? null
+                                      : Colors.grey[400],
+                                ),
+                              ),
+                              onTap: isCurrentFloor
+                                  ? () {
+                                      Navigator.pop(context, room.id);
+                                    }
+                                  : null,
+                            );
+                          },
+                        ),
                 ),
-                title: Text(
-                  room.name,
-                  style: TextStyle(
-                    color: isCurrentFloor ? null : Colors.grey[400],
-                  ),
-                ),
-                subtitle: Text(
-                  isCurrentFloor ? room.type : '${room.type} (Floor ${room.floor})',
-                  style: TextStyle(
-                    color: isCurrentFloor ? null : Colors.grey[400],
-                  ),
-                ),
-                onTap: isCurrentFloor
-                    ? () {
-                        Navigator.pop(context, room.id);
-                      }
-                    : null,
-              );
-            },
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
       );
     } else {
       // For destination selection: group by floor with labels
@@ -1493,72 +1890,160 @@ class _RoomSelectionDialog extends StatelessWidget {
       // Sort floors
       final sortedFloors = roomsByFloor.keys.toList()..sort();
 
-      return AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            itemCount: sortedFloors.fold<int>(
-              0,
-              (sum, floor) => sum + 1 + (roomsByFloor[floor]?.length ?? 0),
-            ),
-            itemBuilder: (context, index) {
-              int currentIndex = 0;
-              
-              for (final floor in sortedFloors) {
-                // Floor header
-                if (index == currentIndex) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+      return MediaQuery.removeViewInsets(
+        context: context,
+        removeBottom: true,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.title),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
                     ),
-                    color: Colors.grey[200],
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+                tooltip: 'Close',
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 20,
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 350,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Results count
+                if (_searchQuery.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      _getFloorLabel(floor),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                      '${selectableRooms.length} room(s) found',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                  );
-                }
-                currentIndex++;
+                  ),
+                // Room list
+                Expanded(
+                  child: selectableRooms.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No rooms found',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: sortedFloors.fold<int>(
+                            0,
+                            (sum, floor) =>
+                                sum + 1 + (roomsByFloor[floor]?.length ?? 0),
+                          ),
+                          itemBuilder: (context, index) {
+                            int currentIndex = 0;
 
-                // Rooms for this floor
-                final floorRooms = roomsByFloor[floor]!;
-                if (index >= currentIndex && index < currentIndex + floorRooms.length) {
-                  final roomIndex = index - currentIndex;
-                  final room = floorRooms[roomIndex];
-                  
-                  return ListTile(
-                    leading: CircleAvatar(
-                      child: Text(
-                        room.name.replaceAll(RegExp(r'[^0-9]'), ''),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    title: Text(room.name),
-                    subtitle: Text(room.type),
-                    onTap: () {
-                      Navigator.pop(context, room.id);
-                    },
-                  );
-                }
-                currentIndex += floorRooms.length;
-              }
+                            for (final floor in sortedFloors) {
+                              // Floor header
+                              if (index == currentIndex) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  color: Colors.grey[200],
+                                  child: Text(
+                                    _getFloorLabel(floor),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                );
+                              }
+                              currentIndex++;
 
-              return const SizedBox.shrink();
-            },
+                              // Rooms for this floor
+                              final floorRooms = roomsByFloor[floor]!;
+                              if (index >= currentIndex &&
+                                  index < currentIndex + floorRooms.length) {
+                                final roomIndex = index - currentIndex;
+                                final room = floorRooms[roomIndex];
+
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    child: Text(
+                                      room.name.replaceAll(
+                                        RegExp(r'[^0-9]'),
+                                        '',
+                                      ),
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  title: Text(room.name),
+                                  subtitle: Text(room.type),
+                                  onTap: () {
+                                    Navigator.pop(context, room.id);
+                                  },
+                                );
+                              }
+                              currentIndex += floorRooms.length;
+                            }
+
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
       );
     }
   }

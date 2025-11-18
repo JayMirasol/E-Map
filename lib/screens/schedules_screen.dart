@@ -104,7 +104,25 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Instructor Schedules'),
+            title: const Text(
+              'Instructor Schedules',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: Colors.white,
+              ),
+            ),
+            centerTitle: true,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.blue[700]!, Colors.blue[500]!],
+                ),
+              ),
+            ),
+            elevation: 0,
             actions: [
               IconButton(
                 tooltip: _showFilters ? 'Hide Filters' : 'Show Filters',
@@ -219,48 +237,79 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
     CampusProvider provider,
   ) {
     final availableNow = provider.instructorAvailableNow(instructor);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () => _showInstructorSchedules(context, instructor, provider),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _profCircleWithPhoto(instructor, provider, radius: 30),
-              if (availableNow)
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        width: 2,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.blue[50]!, Colors.white],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () =>
+                _showInstructorSchedules(context, instructor, provider),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _profCircleWithPhoto(instructor, provider, radius: 30),
+                ),
+                if (availableNow)
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 72,
-          child: Text(
-            _shortName(instructor),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: const TextStyle(fontSize: 12),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 72,
+            child: Text(
+              _shortName(instructor),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

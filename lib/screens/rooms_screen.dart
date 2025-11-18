@@ -5,8 +5,37 @@ import '../widgets/room_tile.dart';
 import '../core/routes.dart';
 import '../widgets/room_details_sheet.dart';
 
-class RoomsScreen extends StatelessWidget {
+class RoomsScreen extends StatefulWidget {
   const RoomsScreen({super.key});
+
+  @override
+  State<RoomsScreen> createState() => _RoomsScreenState();
+}
+
+class _RoomsScreenState extends State<RoomsScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,41 +46,99 @@ class RoomsScreen extends StatelessWidget {
         final rooms = p.rooms;
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Rooms')),
-          body: ListView.separated(
-            itemCount: rooms.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (_, i) => RoomTile(
-              room: rooms[i],
-              onTap: () {
-                // go to map & highlight
-                p.selectRoom(rooms[i].id);
-                Navigator.pushNamed(context, AppRoutes.map);
-              },
-              // NEW: long-press to see details here
-              onLongPress: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                  ),
-                  builder: (_) => DraggableScrollableSheet(
-                    initialChildSize: 0.5,
-                    minChildSize: 0.3,
-                    maxChildSize: 0.9,
-                    expand: false,
-                    builder: (ctx, scrollController) => SingleChildScrollView(
-                      controller: scrollController,
-                      child: RoomDetailsSheet(room: rooms[i]),
-                    ),
-                  ),
-                );
-              },
+          appBar: AppBar(
+            title: const Text(
+              'Room Locator',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: Colors.white,
+              ),
             ),
+            centerTitle: true,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.blue[700]!, Colors.blue[500]!],
+                ),
+              ),
+            ),
+            elevation: 0,
+          ),
+          body: FadeTransition(
+            opacity: _fadeAnimation,
+            child: rooms.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No rooms available',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: rooms.length,
+                    itemBuilder: (_, i) {
+                      return TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        duration: Duration(milliseconds: 400 + (i * 50)),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) {
+                          return Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: Opacity(opacity: value, child: child),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: RoomTile(
+                            room: rooms[i],
+                            onTap: () {
+                              p.selectRoom(rooms[i].id);
+                              Navigator.pushNamed(context, AppRoutes.map);
+                            },
+                            onLongPress: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.surface,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(16),
+                                  ),
+                                ),
+                                builder: (_) => DraggableScrollableSheet(
+                                  initialChildSize: 0.5,
+                                  minChildSize: 0.3,
+                                  maxChildSize: 0.9,
+                                  expand: false,
+                                  builder: (ctx, scrollController) =>
+                                      SingleChildScrollView(
+                                        controller: scrollController,
+                                        child: RoomDetailsSheet(room: rooms[i]),
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         );
       },
