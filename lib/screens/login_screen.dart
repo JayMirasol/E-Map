@@ -108,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   decoration: BoxDecoration(
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.blue.withOpacity(0.3),
+                                        color: Colors.green.withOpacity(0.3),
                                         blurRadius: 30,
                                         spreadRadius: 5,
                                       ),
@@ -121,8 +121,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Colors.blue[700]!,
-                                            Colors.blue[500]!,
+                                            Colors.green[700]!,
+                                            Colors.green[500]!,
                                           ],
                                         ),
                                         shape: BoxShape.circle,
@@ -140,8 +140,8 @@ class _LoginScreenState extends State<LoginScreen>
                               ShaderMask(
                                 shaderCallback: (bounds) => LinearGradient(
                                   colors: [
-                                    Colors.blue[900]!,
-                                    Colors.blue[600]!,
+                                    Colors.green[900]!,
+                                    Colors.green[600]!,
                                   ],
                                 ).createShader(bounds),
                                 child: const Text(
@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen>
                           // Card with form
                           Material(
                             elevation: 8,
-                            shadowColor: Colors.blue.withOpacity(0.3),
+                            shadowColor: Colors.green.withOpacity(0.3),
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(20),
                             child: Padding(
@@ -281,8 +281,8 @@ class _LoginScreenState extends State<LoginScreen>
                                             ? null
                                             : LinearGradient(
                                                 colors: [
-                                                  Colors.blue[700]!,
-                                                  Colors.blue[500]!,
+                                                  Colors.green[700]!,
+                                                  Colors.green[500]!,
                                                 ],
                                               ),
                                         borderRadius: BorderRadius.circular(12),
@@ -290,8 +290,8 @@ class _LoginScreenState extends State<LoginScreen>
                                             ? null
                                             : [
                                                 BoxShadow(
-                                                  color: Colors.blue
-                                                      .withOpacity(0.4),
+                                                  color: Colors.green
+                                                      .withOpacity(0.5),
                                                   blurRadius: 12,
                                                   offset: const Offset(0, 6),
                                                 ),
@@ -351,19 +351,23 @@ class _LoginScreenState extends State<LoginScreen>
                           SizedBox(
                             height: 54,
                             child: OutlinedButton.icon(
-                              icon: const Icon(Icons.arrow_back_rounded),
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                color: Colors.white,
+                              ),
                               label: const Text(
                                 'Back',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 0.5,
+                                  color: Colors.white,
                                 ),
                               ),
                               onPressed: () => Navigator.pop(context),
                               style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: Colors.blue[700]!,
+                                side: const BorderSide(
+                                  color: Colors.white,
                                   width: 2,
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -397,7 +401,7 @@ class _BackgroundDesign extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          colors: [Color(0xFFE8F5E9), Color(0xFFA5D6A7), Color(0xFF66BB6A)],
           stops: [0.0, 0.5, 1.0],
         ),
       ),

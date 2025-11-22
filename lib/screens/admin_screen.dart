@@ -37,7 +37,7 @@ class AdminScreen extends StatelessWidget {
             flexibleSpace: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.blue[700]!, Colors.blue[500]!],
+                  colors: [Colors.green[700]!, Colors.green[500]!],
                 ),
               ),
             ),
@@ -47,18 +47,19 @@ class AdminScreen extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 fontSize: 22,
                 letterSpacing: 0.5,
+                color: Colors.white,
               ),
             ),
           ),
           floatingActionButton: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.blue[700]!, Colors.blue[500]!],
+                colors: [Colors.green[700]!, Colors.green[500]!],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.blue.withOpacity(0.4),
+                  color: Colors.green.withOpacity(0.4),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -79,132 +80,149 @@ class AdminScreen extends StatelessWidget {
               onPressed: () => _openScheduleForm(context),
             ),
           ),
-          body: sorted.isEmpty
-              ? const Center(
-                  child: Text('No schedules yet. Tap "Add Schedule".'),
-                )
-              : ListView.separated(
-                  itemCount: sorted.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final s = sorted[i];
-                    final room = p.roomById(s.roomId);
-                    final roomName = room?.name ?? s.roomId;
-                    return Dismissible(
-                      key: ValueKey(s.id),
-                      background: Container(
-                        color: Colors.redAccent,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 16),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      secondaryBackground: Container(
-                        color: Colors.redAccent,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      confirmDismiss: (_) async {
-                        return await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Delete schedule?'),
-                                content: Text(
-                                  '${s.subject} by ${s.instructor}\n$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFE8F5E9),
+                  Color(0xFFA5D6A7),
+                  Color(0xFF66BB6A),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+            child: sorted.isEmpty
+                ? const Center(
+                    child: Text('No schedules yet. Tap "Add Schedule".'),
+                  )
+                : ListView.separated(
+                    itemCount: sorted.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final s = sorted[i];
+                      final room = p.roomById(s.roomId);
+                      final roomName = room?.name ?? s.roomId;
+                      return Dismissible(
+                        key: ValueKey(s.id),
+                        background: Container(
+                          color: Colors.redAccent,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 16),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        secondaryBackground: Container(
+                          color: Colors.redAccent,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        confirmDismiss: (_) async {
+                          return await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Delete schedule?'),
+                                  content: Text(
+                                    '${s.subject} by ${s.instructor}\n$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
+                              ) ??
+                              false;
+                        },
+                        onDismissed: (_) => p.deleteSchedule(s.id),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey[200]!,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
                               ),
-                            ) ??
-                            false;
-                      },
-                      onDismissed: (_) => p.deleteSchedule(s.id),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey[200]!,
-                            width: 1,
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                          ],
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          leading: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.blue[100]!, Colors.blue[50]!],
+                            leading: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.green[100]!,
+                                    Colors.green[50]!,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.event_note_rounded,
-                              color: Colors.blue[700],
-                              size: 24,
-                            ),
-                          ),
-                          title: Text(
-                            '${s.instructor} — ${s.subject}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                          trailing: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.edit_rounded,
+                              child: Icon(
+                                Icons.event_note_rounded,
                                 color: Colors.blue[700],
+                                size: 24,
                               ),
-                              onPressed: () =>
-                                  _openScheduleForm(context, existing: s),
-                              tooltip: 'Edit',
+                            ),
+                            title: Text(
+                              '${s.instructor} — ${s.subject}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                '$roomName • ${s.day} ${fmt.format(s.start)}–${fmt.format(s.end)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                            trailing: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.edit_rounded,
+                                  color: Colors.green[700],
+                                ),
+                                onPressed: () =>
+                                    _openScheduleForm(context, existing: s),
+                                tooltip: 'Edit',
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
+          ),
         );
       },
     );

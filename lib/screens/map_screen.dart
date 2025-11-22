@@ -69,7 +69,7 @@ class _MapScreenState extends State<MapScreen> {
                   final color = selected
                       ? Colors
                             .red // highlight selected
-                      : (occupied ? Colors.orange : Colors.blue);
+                      : (occupied ? Colors.orange : Colors.green);
 
                   return Marker(
                     point: LatLng(r.lat, r.lng),

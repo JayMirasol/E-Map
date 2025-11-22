@@ -74,7 +74,7 @@ class _LandingScreenState extends State<LandingScreen>
                               decoration: BoxDecoration(
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.blue.withOpacity(0.2),
+                                    color: Colors.green.withOpacity(0.2),
                                     blurRadius: 30,
                                     spreadRadius: 5,
                                   ),
@@ -87,8 +87,8 @@ class _LandingScreenState extends State<LandingScreen>
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Colors.blue[700]!,
-                                        Colors.blue[500]!,
+                                        Colors.green[700]!,
+                                        Colors.green[500]!,
                                       ],
                                     ),
                                     shape: BoxShape.circle,
@@ -107,7 +107,7 @@ class _LandingScreenState extends State<LandingScreen>
                           // Title with gradient
                           ShaderMask(
                             shaderCallback: (bounds) => LinearGradient(
-                              colors: [Colors.blue[700]!, Colors.blue[500]!],
+                              colors: [Colors.green[700]!, Colors.green[500]!],
                             ).createShader(bounds),
                             child: const Text(
                               'E-MAP',
@@ -228,7 +228,7 @@ class _BackgroundDesign extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
+          colors: [Color(0xFFE8F5E9), Color(0xFFA5D6A7), Color(0xFF66BB6A)],
           stops: [0.0, 0.5, 1.0],
         ),
       ),
@@ -286,18 +286,19 @@ class _EnhancedButton extends StatelessWidget {
         width: double.infinity,
         height: 54,
         child: OutlinedButton.icon(
-          icon: Icon(icon, size: 22),
+          icon: Icon(icon, size: 22, color: Colors.white),
           label: Text(
             label,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
+              color: Colors.white,
             ),
           ),
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
-            side: BorderSide(color: Colors.blue[700]!, width: 2),
+            side: const BorderSide(color: Colors.white, width: 2),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -323,9 +324,9 @@ class _EnhancedButton extends StatelessWidget {
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
-            foregroundColor: Colors.blue[700],
+            foregroundColor: Colors.green[700],
             elevation: 4,
-            shadowColor: Colors.blue.withOpacity(0.3),
+            shadowColor: Colors.green.withOpacity(0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -339,12 +340,12 @@ class _EnhancedButton extends StatelessWidget {
       height: 54,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue[700]!, Colors.blue[500]!],
+          colors: [Colors.green[700]!, Colors.green[500]!],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.4),
+            color: Colors.green.withOpacity(0.4),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

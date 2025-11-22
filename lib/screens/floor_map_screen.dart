@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -43,10 +45,21 @@ class _FloorMapScreenState extends State<FloorMapScreen>
   // Manual route editing
   bool _editMode = false;
 
+  // Floor transition dialog state
+  bool _showMinimizedButton = false;
+  bool _showContinuePrompt = false;
+  Timer? _continuePromptTimer;
+  Timer? _countdownTimer;
+  int _countdownSeconds = 10;
+  int? _pendingNextFloor;
+  String? _pendingDestRoomName;
+
   // Animation controllers
   late AnimationController _pathAnimationController;
   late AnimationController _markerAnimationController;
+  late AnimationController _walkingPersonAnimationController;
   late Animation<double> _pathAnimation;
+  late Animation<double> _walkingPersonAnimation;
 
   @override
   void initState() {
@@ -74,6 +87,13 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       vsync: this,
     );
 
+    _walkingPersonAnimationController = AnimationController(
+      duration: const Duration(
+        milliseconds: 5000,
+      ), // 5 seconds to walk the entire path
+      vsync: this,
+    );
+
     // Path drawing animation with delay
     _pathAnimation = CurvedAnimation(
       parent: _pathAnimationController,
@@ -84,9 +104,17 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       ), // 40% delay before drawing starts
     );
 
+    // Walking person animation - loops continuously after path is drawn
+    _walkingPersonAnimation = CurvedAnimation(
+      parent: _walkingPersonAnimationController,
+      curve: Curves.linear,
+    );
+
     // When path animation completes, auto-switch to next floor if needed
     _pathAnimationController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
+        // Start walking person animation after path is drawn
+        _walkingPersonAnimationController.repeat();
         _onPathAnimationCompleted();
       }
     });
@@ -114,6 +142,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     _transformationController.dispose();
     _pathAnimationController.dispose();
     _markerAnimationController.dispose();
+    _walkingPersonAnimationController.dispose();
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
     // Restore all orientations when leaving this screen
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -128,7 +159,14 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     setState(() {
       _startRoomId = null;
       _destinationRoomId = null;
+      _showMinimizedButton = false;
+      _showContinuePrompt = false;
+      _countdownSeconds = 10;
+      _pendingNextFloor = null;
+      _pendingDestRoomName = null;
     });
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
     context.read<CampusProvider>().selectRoom(null);
 
     // Reset animations
@@ -174,7 +212,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 
   void _onPathAnimationCompleted() {
     // If the route includes multiple floors and this is not the last segment,
-    // automatically switch to the next floor after a short overlay.
+    // show a dialog requiring user confirmation before switching to the next floor.
     if (_editMode) return; // don't auto-switch while editing
     if (_autoSwitchDone) return;
     if (_routeFloorOrder.isEmpty) return;
@@ -182,54 +220,240 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     final currentIndex = floors.indexOf(widget.floorNumber);
     if (currentIndex == -1) return;
     final isLast = currentIndex >= floors.length - 1;
-    if (isLast) return;
 
-    // Show a brief overlay then push the next floor
-    setState(() => _showSwitchOverlay = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      final nextFloor = floors[currentIndex + 1];
-      Navigator.of(context).push(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 600),
-          reverseTransitionDuration: const Duration(milliseconds: 400),
-          pageBuilder: (_, __, ___) => FloorMapScreen(
-            floorNumber: nextFloor,
-            floorTitle: nextFloor == 1
-                ? 'Ground Floor'
-                : nextFloor == 2
-                ? '2nd Floor: Main Building'
-                : nextFloor == 3
-                ? '3rd Floor'
-                : '4th Floor',
-            imagePath: nextFloor == 1
-                ? 'assets/images/1ST FLOOR.jpg'
-                : nextFloor == 2
-                ? 'assets/images/2ND FLOOR.jpg'
-                : nextFloor == 3
-                ? 'assets/images/3RD FLOOR.jpg'
-                : 'assets/images/4TH FLOOR.jpg',
-            initialStartRoomId: _startRoomId,
-            initialDestinationRoomId: _destinationRoomId,
-          ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final tween = Tween(
-              begin: const Offset(0.0, 0.1),
-              end: Offset.zero,
-            ).chain(CurveTween(curve: Curves.easeInOut));
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: animation.drive(tween),
-                child: child,
-              ),
-            );
-          },
+    // Check if this is the last floor - show destination reached message
+    if (isLast) {
+      final provider = context.read<CampusProvider>();
+      final destRoom = provider.roomById(_destinationRoomId!);
+      final destRoomName = destRoom?.name ?? 'destination';
+
+      _showDestinationReachedDialog(destRoomName);
+      return;
+    }
+
+    final nextFloor = floors[currentIndex + 1];
+    final provider = context.read<CampusProvider>();
+    final destRoom = provider.roomById(_destinationRoomId!);
+    final destRoomName = destRoom?.name ?? 'destination';
+
+    // Store pending floor info
+    _pendingNextFloor = nextFloor;
+    _pendingDestRoomName = destRoomName;
+
+    // Show dialog requiring user to click Continue
+    _showFloorTransitionDialog(nextFloor, destRoomName);
+  }
+
+  void _showDestinationReachedDialog(String destRoomName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 32),
+            SizedBox(width: 12),
+            Expanded(child: Text('Destination Reached!')),
+          ],
         ),
-      );
-      _autoSwitchDone = true;
-      _showSwitchOverlay = false;
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You have arrived at your destination!',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.room, color: Colors.green[700], size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      destRoomName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Thank you for using E-MAP navigation system!',
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.done),
+            label: const Text('Done'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFloorTransitionDialog(int nextFloor, String destRoomName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.stairs, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Expanded(child: Text('Heading to Stairs!')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are heading towards the stairs!',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Please review the path on Floor ${widget.floorNumber} first, then click Continue to switch to Floor $nextFloor and locate your destination room: $destRoomName.',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.visibility),
+            label: const Text('See Direction First'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.blue,
+              side: const BorderSide(color: Colors.blue),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              setState(() {
+                _showMinimizedButton = true;
+                _showContinuePrompt = false;
+                _countdownSeconds = 10;
+              });
+
+              // Start countdown timer (updates every second)
+              _countdownTimer?.cancel();
+              _countdownTimer = Timer.periodic(const Duration(seconds: 1), (
+                timer,
+              ) {
+                if (!mounted) {
+                  timer.cancel();
+                  return;
+                }
+                setState(() {
+                  _countdownSeconds--;
+                });
+
+                if (_countdownSeconds <= 0) {
+                  timer.cancel();
+                }
+              });
+
+              // Start 10-second timer to show prompt
+              _continuePromptTimer?.cancel();
+              _continuePromptTimer = Timer(const Duration(seconds: 10), () {
+                if (mounted) {
+                  setState(() {
+                    _showContinuePrompt = true;
+                  });
+                }
+              });
+            },
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Continue'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              _proceedToNextFloor(nextFloor);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _proceedToNextFloor(int nextFloor) {
+    // Clean up timers
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
+
+    // Navigate to next floor
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 600),
+        reverseTransitionDuration: const Duration(milliseconds: 400),
+        pageBuilder: (_, __, ___) => FloorMapScreen(
+          floorNumber: nextFloor,
+          floorTitle: nextFloor == 1
+              ? 'Ground Floor'
+              : nextFloor == 2
+              ? '2nd Floor: Main Building'
+              : nextFloor == 3
+              ? '3rd Floor'
+              : '4th Floor',
+          imagePath: nextFloor == 1
+              ? 'assets/images/1ST FLOOR.jpg'
+              : nextFloor == 2
+              ? 'assets/images/2ND FLOOR.jpg'
+              : nextFloor == 3
+              ? 'assets/images/3RD FLOOR.jpg'
+              : 'assets/images/4TH FLOOR.jpg',
+          initialStartRoomId: _startRoomId,
+          initialDestinationRoomId: _destinationRoomId,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final tween = Tween(
+            begin: const Offset(0.0, 0.1),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeInOut));
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
+    _autoSwitchDone = true;
+    setState(() {
+      _showMinimizedButton = false;
+      _showContinuePrompt = false;
+      _countdownSeconds = 10;
     });
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
   }
 
   bool _areAllRequiredFloorsComplete(CampusProvider provider) {
@@ -404,6 +628,71 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                   );
                                 },
                               ),
+                            // Animated walking person along the path
+                            if (_startRoomId != null &&
+                                _destinationRoomId != null &&
+                                !_editMode)
+                              AnimatedBuilder(
+                                animation: _walkingPersonAnimation,
+                                builder: (context, child) {
+                                  final pts = _routeByFloor[widget.floorNumber];
+                                  if (pts == null || pts.length < 2) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  // Calculate position along the path
+                                  final progress =
+                                      _walkingPersonAnimation.value;
+                                  final totalSegments = pts.length - 1;
+                                  final segmentProgress =
+                                      progress * totalSegments;
+                                  final currentSegment = segmentProgress
+                                      .floor();
+                                  final segmentFraction =
+                                      segmentProgress - currentSegment;
+
+                                  if (currentSegment >= totalSegments) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final start = pts[currentSegment];
+                                  final end = pts[currentSegment + 1];
+                                  final currentPos = Offset(
+                                    start.dx +
+                                        (end.dx - start.dx) * segmentFraction,
+                                    start.dy +
+                                        (end.dy - start.dy) * segmentFraction,
+                                  );
+
+                                  final x =
+                                      currentPos.dx * constraints.maxWidth;
+                                  final y =
+                                      currentPos.dy * constraints.maxHeight;
+
+                                  // Calculate walking direction for rotation
+                                  final dx = end.dx - start.dx;
+                                  final dy = end.dy - start.dy;
+                                  final angle = dx.abs() < 0.001
+                                      ? 0.0
+                                      : atan(dy / dx);
+
+                                  return Positioned(
+                                    left: x - 12,
+                                    top: y - 12,
+                                    child: Transform.rotate(
+                                      angle: angle,
+                                      child: CustomPaint(
+                                        size: const Size(24, 24),
+                                        painter: StickPersonPainter(
+                                          walkCycle:
+                                              (progress * 4) %
+                                              1.0, // Leg animation cycle
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             // Pulsing stair marker on this floor (if any)
                             Builder(
                               builder: (_) {
@@ -548,13 +837,16 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                 markerSize = 12;
                                 markerIcon = Icons.circle;
                               } else {
-                                color = Colors.blue;
+                                color = Colors.green;
                                 markerSize = 12;
                                 markerIcon = Icons.circle;
                               }
 
-                              // Hide regular markers if no start room is selected
-                              if (!isStart && !isDest && _startRoomId == null) {
+                              // Hide regular markers if no start room is selected (except selected room)
+                              if (!isStart &&
+                                  !isDest &&
+                                  !selected &&
+                                  _startRoomId == null) {
                                 return const SizedBox.shrink();
                               }
 
@@ -623,6 +915,112 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                 ),
                               );
                             }),
+                            // Minimized floor transition button
+                            if (_showMinimizedButton)
+                              Positioned(
+                                bottom: 16,
+                                right: 16,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    _continuePromptTimer?.cancel();
+                                    _countdownTimer?.cancel();
+                                    setState(() {
+                                      _showMinimizedButton = false;
+                                      _showContinuePrompt = false;
+                                      _countdownSeconds = 10;
+                                    });
+                                    if (_pendingNextFloor != null &&
+                                        _pendingDestRoomName != null) {
+                                      _showFloorTransitionDialog(
+                                        _pendingNextFloor!,
+                                        _pendingDestRoomName!,
+                                      );
+                                    }
+                                  },
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      // Countdown display above the button
+                                      if (_countdownSeconds > 0)
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${_countdownSeconds}s',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      // Main button
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.orange[700]!,
+                                              Colors.orange[500]!,
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            50,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.3,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.stairs,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
+                                            if (_showContinuePrompt) ...[
+                                              const SizedBox(width: 8),
+                                              const Text(
+                                                'Continue?',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              const Icon(
+                                                Icons.arrow_forward,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       );
@@ -693,10 +1091,10 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue[50],
+                                    color: Colors.green[50],
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: Colors.blue[200]!,
+                                      color: Colors.green[200]!,
                                     ),
                                   ),
                                   child: Row(
@@ -704,7 +1102,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                       Icon(
                                         Icons.edit_location,
                                         size: 16,
-                                        color: Colors.blue[700],
+                                        color: Colors.green[700],
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
@@ -713,7 +1111,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.blue[700],
+                                            color: Colors.green[700],
                                           ),
                                         ),
                                       ),
@@ -887,7 +1285,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                             ),
                                             backgroundColor:
                                                 f == widget.floorNumber
-                                                ? Colors.blue[100]
+                                                ? Colors.green[100]
                                                 : Colors.grey[100],
                                           );
                                         }).toList(),
@@ -971,7 +1369,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                   'Required floors: ${requiredFloors.join(", ")}',
                                                   style: const TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.blue,
+                                                    color: Colors.green,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -1214,7 +1612,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                       style:
                                                           ElevatedButton.styleFrom(
                                                             backgroundColor:
-                                                                Colors.blue,
+                                                                Colors.green,
                                                             foregroundColor:
                                                                 Colors.white,
                                                           ),
@@ -1411,7 +1809,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                               _buildLegendItem(Colors.green, 'Start'),
                               _buildLegendItem(Colors.red, 'Destination'),
                               _buildLegendItem(Colors.orange, 'Occupied'),
-                              _buildLegendItem(Colors.blue, 'Available'),
+                              _buildLegendItem(Colors.green, 'Available'),
                             ],
                           ),
                         ),
@@ -1509,7 +1907,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
           builder: (context) => AlertDialog(
             title: const Row(
               children: [
-                Icon(Icons.edit_location, color: Colors.blue),
+                Icon(Icons.edit_location, color: Colors.green),
                 SizedBox(width: 8),
                 Text('Cross-Floor Route'),
               ],
@@ -1529,9 +1927,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: Colors.green[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
+                    border: Border.all(color: Colors.green[200]!),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1651,7 +2049,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: occupied ? Colors.orange : Colors.blue,
+                        backgroundColor: occupied
+                            ? Colors.orange
+                            : Colors.green,
                         child: Text(
                           room.name.replaceAll(RegExp(r'[^0-9]'), ''),
                           style: const TextStyle(
@@ -2183,5 +2583,77 @@ class PathLinePainter extends CustomPainter {
   bool shouldRepaint(PathLinePainter oldDelegate) {
     return oldDelegate.pathPoints != pathPoints ||
         oldDelegate.animationProgress != animationProgress;
+  }
+}
+
+// Painter for animated stick person walking along the path
+class StickPersonPainter extends CustomPainter {
+  final double walkCycle; // 0.0 to 1.0 for leg animation
+
+  StickPersonPainter({required this.walkCycle});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.blue
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Head
+    canvas.drawCircle(Offset(center.dx, center.dy - 6), 4, paint);
+
+    // Body
+    canvas.drawLine(
+      Offset(center.dx, center.dy - 2),
+      Offset(center.dx, center.dy + 6),
+      paint,
+    );
+
+    // Arms (swinging)
+    final armSwing = sin(walkCycle * 2 * pi) * 3;
+    canvas.drawLine(
+      Offset(center.dx, center.dy),
+      Offset(center.dx - 4, center.dy + 2 + armSwing),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(center.dx, center.dy),
+      Offset(center.dx + 4, center.dy + 2 - armSwing),
+      paint,
+    );
+
+    // Legs (walking animation)
+    final legSwing = sin(walkCycle * 2 * pi) * 4;
+    canvas.drawLine(
+      Offset(center.dx, center.dy + 6),
+      Offset(center.dx - 2, center.dy + 12 + legSwing),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(center.dx, center.dy + 6),
+      Offset(center.dx + 2, center.dy + 12 - legSwing),
+      paint,
+    );
+
+    // Add a small shadow/circle at feet for better visibility
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(center.dx, center.dy + 14),
+        width: 8,
+        height: 3,
+      ),
+      shadowPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(StickPersonPainter oldDelegate) {
+    return oldDelegate.walkCycle != walkCycle;
   }
 }

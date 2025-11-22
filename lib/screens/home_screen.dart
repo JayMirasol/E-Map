@@ -35,29 +35,29 @@ class _HomeScreenState extends State<HomeScreen>
         title: 'Room Locator',
         icon: Icons.location_on_rounded,
         route: AppRoutes.rooms,
-        primaryColor: const Color(0xFF42A5F5),
-        secondaryColor: const Color(0xFF42A5F5),
+        primaryColor: const Color(0xFF66BB6A),
+        secondaryColor: const Color(0xFF66BB6A),
       ),
       _HomeTile(
         title: 'Instructor Schedules',
         icon: Icons.schedule_rounded,
         route: AppRoutes.schedules,
-        primaryColor: const Color(0xFF42A5F5),
-        secondaryColor: const Color(0xFF42A5F5),
+        primaryColor: const Color(0xFF66BB6A),
+        secondaryColor: const Color(0xFF66BB6A),
       ),
       _HomeTile(
         title: 'Faculty Rooms',
         icon: Icons.meeting_room_rounded,
         route: AppRoutes.faculty,
-        primaryColor: const Color(0xFF42A5F5),
-        secondaryColor: const Color(0xFF42A5F5),
+        primaryColor: const Color(0xFF66BB6A),
+        secondaryColor: const Color(0xFF66BB6A),
       ),
       _HomeTile(
         title: 'Laboratory Rooms',
         icon: Icons.computer_rounded,
         route: AppRoutes.labs,
-        primaryColor: const Color(0xFF42A5F5),
-        secondaryColor: const Color(0xFF42A5F5),
+        primaryColor: const Color(0xFF66BB6A),
+        secondaryColor: const Color(0xFF66BB6A),
       ),
     ];
 
@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.blue[50]!, Colors.white],
+            colors: [Colors.green[50]!, Colors.white],
           ),
         ),
         child: SafeArea(
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen>
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
-            color: Colors.blue[900],
+            color: Colors.green[900],
             letterSpacing: 0.5,
           ),
         ),
@@ -219,12 +219,12 @@ class _EnhancedStartButton extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.blue[700]!, Colors.blue[500]!],
+          colors: [Colors.green[700]!, Colors.green[500]!],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.4),
+            color: Colors.green.withOpacity(0.4),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),

@@ -118,7 +118,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Colors.blue[700]!, Colors.blue[500]!],
+                  colors: [Colors.green[700]!, Colors.green[500]!],
                 ),
               ),
             ),
@@ -242,7 +242,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.blue[50]!, Colors.white],
+          colors: [Colors.green[50]!, Colors.white],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -269,7 +269,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.green.withOpacity(0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -922,12 +922,21 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
       return;
     }
 
-    // Get all rooms on the same floor as the destination, excluding waypoints
-    final roomsOnFloor =
-        widget.provider.rooms
-            .where((r) => r.floor == room.floor && r.type != 'waypoint')
-            .toList()
-          ..sort((a, b) => a.name.compareTo(b.name));
+    // Get all rooms from all floors, excluding waypoints, grouped by floor
+    final allRooms = widget.provider.rooms
+        .where((r) => r.type != 'waypoint' && r.floor != null)
+        .toList()
+      ..sort((a, b) {
+        final floorCompare = a.floor!.compareTo(b.floor!);
+        if (floorCompare != 0) return floorCompare;
+        return a.name.compareTo(b.name);
+      });
+
+    // Group rooms by floor
+    final Map<int, List<dynamic>> roomsByFloor = {};
+    for (final r in allRooms) {
+      roomsByFloor.putIfAbsent(r.floor!, () => []).add(r);
+    }
 
     showDialog(
       context: context,
@@ -935,33 +944,69 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
         title: const Text('Select Your Current Location'),
         content: SizedBox(
           width: double.maxFinite,
-          child: roomsOnFloor.isEmpty
-              ? const Text('No rooms available on this floor.')
+          height: 400,
+          child: allRooms.isEmpty
+              ? const Text('No rooms available.')
               : ListView.builder(
                   shrinkWrap: true,
-                  itemCount: roomsOnFloor.length,
-                  itemBuilder: (_, i) {
-                    final r = roomsOnFloor[i];
-                    final isSelected = _selectedStartRoomId == r.id;
-                    return ListTile(
-                      selected: isSelected,
-                      leading: Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                      ),
-                      title: Text(r.name),
-                      subtitle: Text('Floor ${r.floor}'),
-                      onTap: () {
-                        setState(() {
-                          _selectedStartRoomId = r.id;
-                        });
-                        Navigator.of(ctx).pop();
-                      },
-                    );
+                  itemCount: roomsByFloor.length +
+                      allRooms.length, // headers + rooms
+                  itemBuilder: (_, index) {
+                    int itemsSoFar = 0;
+
+                    // Calculate which floor and item we're at
+                    for (final floor in roomsByFloor.keys.toList()..sort()) {
+                      if (index == itemsSoFar) {
+                        // Floor header
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 16,
+                          ),
+                          color: Colors.green[100],
+                          child: Text(
+                            'Floor $floor',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[900],
+                              fontSize: 16,
+                            ),
+                          ),
+                        );
+                      }
+                      itemsSoFar++;
+
+                      final roomsOnFloor = roomsByFloor[floor]!;
+                      final roomIndex = index - itemsSoFar;
+
+                      if (roomIndex >= 0 && roomIndex < roomsOnFloor.length) {
+                        final r = roomsOnFloor[roomIndex];
+                        final isSelected = _selectedStartRoomId == r.id;
+                        return ListTile(
+                          selected: isSelected,
+                          leading: Icon(
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                          title: Text(r.name),
+                          subtitle: Text('Floor ${r.floor}'),
+                          onTap: () {
+                            setState(() {
+                              _selectedStartRoomId = r.id;
+                            });
+                            Navigator.of(ctx).pop();
+                          },
+                        );
+                      }
+
+                      itemsSoFar += roomsOnFloor.length;
+                    }
+
+                    return const SizedBox.shrink();
                   },
                 ),
         ),
@@ -990,31 +1035,12 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
       return;
     }
 
-    if (startRoom.floor != destRoom.floor) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Start (Floor ${startRoom.floor}) and destination (Floor ${destRoom.floor}) are on different floors. Please select rooms on the same floor.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (destRoom.floor == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Destination room has no floor information.'),
-        ),
-      );
-      return;
-    }
-
-    // Navigate to the floor map with start and destination pre-selected
+    // Navigate to the floor map with both rooms selected (supports cross-floor)
+    // The FloorMapScreen will handle cross-floor routing using manual routes
     Navigator.of(context).pop(); // Close instructor detail screen
     _navigateToFloorMapWithPath(
       context,
-      destRoom.floor!,
+      startRoom.floor!,
       _selectedStartRoomId!,
       _selectedDestinationRoomId!,
     );

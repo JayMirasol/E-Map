@@ -59,7 +59,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Colors.blue[800]!, Colors.blue[600]!],
+              colors: [Colors.green[800]!, Colors.green[600]!],
             ),
           ),
         ),
@@ -275,7 +275,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.blue.withOpacity(0.2),
+                color: Colors.green.withOpacity(0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -377,7 +377,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Colors.white, Colors.blue[50]!],
+                      colors: [Colors.white, Colors.green[50]!],
                     ),
                   ),
                   padding: const EdgeInsets.all(16),
@@ -398,7 +398,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                           Icon(
                             Icons.info_outline,
                             size: 16,
-                            color: Colors.blue[700],
+                            color: Colors.green[700],
                           ),
                           const SizedBox(width: 6),
                           Expanded(

@@ -64,7 +64,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue[700]!, Colors.blue[500]!],
+              colors: [Colors.green[700]!, Colors.green[500]!],
             ),
           ),
         ),
@@ -74,6 +74,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
             fontWeight: FontWeight.w700,
             fontSize: 22,
             letterSpacing: 0.5,
+            color: Colors.white,
           ),
         ),
         bottom: PreferredSize(
@@ -99,14 +100,14 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.blue[50]!,
-                    Colors.blue[100]!,
-                    Colors.blue[200]!,
+                    Colors.green[50]!,
+                    Colors.green[100]!,
+                    Colors.green[200]!,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withOpacity(0.15),
+                    color: Colors.green.withOpacity(0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -139,7 +140,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                           errorBuilder: (_, __, ___) => Icon(
                             Icons.school_rounded,
                             size: 40,
-                            color: Colors.blue[700],
+                            color: Colors.green[700],
                           ),
                         ),
                       ),
@@ -153,7 +154,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                       children: [
                         ShaderMask(
                           shaderCallback: (bounds) => LinearGradient(
-                            colors: [Colors.blue[900]!, Colors.blue[600]!],
+                            colors: [Colors.green[900]!, Colors.green[600]!],
                           ).createShader(bounds),
                           child: const Text(
                             'E-MAP',
@@ -171,7 +172,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Colors.blue[900],
+                            color: Colors.green[900],
                             height: 1.3,
                           ),
                         ),
@@ -197,11 +198,16 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.grey[50]!, Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE8F5E9),
+                      Color(0xFFA5D6A7),
+                      Color(0xFF66BB6A),
+                    ],
+                    stops: [0.0, 0.5, 1.0],
                   ),
                 ),
                 child: Scrollbar(
@@ -224,8 +230,8 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.blue[700]!,
-                                    Colors.blue[400]!,
+                                    Colors.green[700]!,
+                                    Colors.green[400]!,
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
@@ -239,7 +245,7 @@ Overall, eMap aims to enhance the student experience by providing a modern and e
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.blue[900],
+                                color: Colors.green[900],
                                 letterSpacing: 0.5,
                               ),
                             ),

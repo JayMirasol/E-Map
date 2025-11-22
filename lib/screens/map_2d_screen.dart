@@ -93,7 +93,7 @@ class _Map2DScreenState extends State<Map2DScreen> {
 
                             final color = selected
                                 ? Colors.red
-                                : (occupied ? Colors.orange : Colors.blue);
+                                : (occupied ? Colors.orange : Colors.green);
 
                             // Use image size for positioning
                             // fx and fy are fractional coordinates (0.0 to 1.0)

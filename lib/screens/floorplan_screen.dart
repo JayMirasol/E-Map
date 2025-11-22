@@ -372,7 +372,7 @@ class _FloorCanvasState extends State<_FloorCanvas>
                                 width: 24,
                                 height: 24,
                                 decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withOpacity(0.9),
+                                  color: Colors.greenAccent.withOpacity(0.9),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
