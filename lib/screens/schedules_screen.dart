@@ -923,14 +923,15 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
     }
 
     // Get all rooms from all floors, excluding waypoints, grouped by floor
-    final allRooms = widget.provider.rooms
-        .where((r) => r.type != 'waypoint' && r.floor != null)
-        .toList()
-      ..sort((a, b) {
-        final floorCompare = a.floor!.compareTo(b.floor!);
-        if (floorCompare != 0) return floorCompare;
-        return a.name.compareTo(b.name);
-      });
+    final allRooms =
+        widget.provider.rooms
+            .where((r) => r.type != 'waypoint' && r.floor != null)
+            .toList()
+          ..sort((a, b) {
+            final floorCompare = a.floor!.compareTo(b.floor!);
+            if (floorCompare != 0) return floorCompare;
+            return a.name.compareTo(b.name);
+          });
 
     // Group rooms by floor
     final Map<int, List<dynamic>> roomsByFloor = {};
@@ -949,8 +950,8 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
               ? const Text('No rooms available.')
               : ListView.builder(
                   shrinkWrap: true,
-                  itemCount: roomsByFloor.length +
-                      allRooms.length, // headers + rooms
+                  itemCount:
+                      roomsByFloor.length + allRooms.length, // headers + rooms
                   itemBuilder: (_, index) {
                     int itemsSoFar = 0;
 
