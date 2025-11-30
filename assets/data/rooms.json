@@ -101,6 +101,42 @@
   {"id":"R408","name":"R408","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.790,"fy":0.414},
   {"id":"R409","name":"R409","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.790,"fy":0.612},
   {"id":"R410","name":"R410","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.790,"fy":0.751},
-  {"id":"R411","name":"R411","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.790,"fy":0.937}
+  {"id":"R411","name":"R411","type":"classroom","floor":4,"lat":15.14715,"lng":120.58745,"fx":0.790,"fy":0.937},
+
+  {"id":"NGO_CANTEEN","name":"NGO Canteen","type":"office","floor":5,"lat":15.14715,"lng":120.58745,"fx":0.763,"fy":0.542},
+  {"id":"N101","name":"N101","type":"classroom","floor":5,"lat":15.14715,"lng":120.58745,"fx":0.279,"fy":0.549},
+  {"id":"N102","name":"N102","type":"classroom","floor":5,"lat":15.14715,"lng":120.58745,"fx":0.412,"fy":0.556},
+  {"id":"N103","name":"N103","type":"classroom","floor":5,"lat":15.14715,"lng":120.58745,"fx":0.537,"fy":0.560},
+  {"id":"FIRE_EXT_NGO_GF","name":"Fire Extinguisher - NGO Ground Floor","type":"safety","floor":5,"lat":15.14715,"lng":120.58745,"fx":0.131,"fy":0.442},
+
+  {"id":"NGO_IEAS","name":"NGO IEAS","type":"office","floor":6,"lat":15.14715,"lng":120.58745,"fx":0.334,"fy":0.556},
+  {"id":"N203","name":"N203","type":"classroom","floor":6,"lat":15.14715,"lng":120.58745,"fx":0.548,"fy":0.525},
+  {"id":"N204","name":"N204","type":"classroom","floor":6,"lat":15.14715,"lng":120.58745,"fx":0.685,"fy":0.551},
+  {"id":"N205","name":"N205","type":"classroom","floor":6,"lat":15.14715,"lng":120.58745,"fx":0.823,"fy":0.523},
+  {"id":"FIRE_EXT_NGO_2F","name":"Fire Extinguisher - NGO 2nd Floor","type":"safety","floor":6,"lat":15.14715,"lng":120.58745,"fx":0.131,"fy":0.458},
+
+  {"id":"P101","name":"P101","type":"classroom","floor":7,"lat":15.14715,"lng":120.58745,"fx":0.260,"fy":0.441},
+  {"id":"P102","name":"P102","type":"classroom","floor":7,"lat":15.14715,"lng":120.58745,"fx":0.384,"fy":0.425},
+  {"id":"P103","name":"P103","type":"classroom","floor":7,"lat":15.14715,"lng":120.58745,"fx":0.508,"fy":0.419},
+  {"id":"P104","name":"P104","type":"classroom","floor":7,"lat":15.14715,"lng":120.58745,"fx":0.628,"fy":0.441},
+  {"id":"P105","name":"P105","type":"classroom","floor":7,"lat":15.14715,"lng":120.58745,"fx":0.737,"fy":0.419},
+
+  {"id":"P201","name":"P201","type":"classroom","floor":8,"lat":15.14715,"lng":120.58745,"fx":0.266,"fy":0.425},
+  {"id":"P202","name":"P202","type":"classroom","floor":8,"lat":15.14715,"lng":120.58745,"fx":0.383,"fy":0.425},
+  {"id":"P203","name":"P203","type":"classroom","floor":8,"lat":15.14715,"lng":120.58745,"fx":0.509,"fy":0.425},
+  {"id":"P204","name":"P204","type":"classroom","floor":8,"lat":15.14715,"lng":120.58745,"fx":0.621,"fy":0.425},
+  {"id":"P205","name":"P205","type":"classroom","floor":8,"lat":15.14715,"lng":120.58745,"fx":0.747,"fy":0.425},
+
+  {"id":"P301","name":"P301","type":"classroom","floor":9,"lat":15.14715,"lng":120.58745,"fx":0.262,"fy":0.398},
+  {"id":"P302","name":"P302","type":"classroom","floor":9,"lat":15.14715,"lng":120.58745,"fx":0.386,"fy":0.400},
+  {"id":"P303","name":"P303","type":"classroom","floor":9,"lat":15.14715,"lng":120.58745,"fx":0.499,"fy":0.400},
+  {"id":"P304","name":"P304","type":"classroom","floor":9,"lat":15.14715,"lng":120.58745,"fx":0.626,"fy":0.400},
+  {"id":"P305","name":"P305","type":"classroom","floor":9,"lat":15.14715,"lng":120.58745,"fx":0.738,"fy":0.400},
+
+  {"id":"P401","name":"P401","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.264,"fy":0.407},
+  {"id":"P402","name":"P402","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.384,"fy":0.407},
+  {"id":"P403","name":"P403","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.507,"fy":0.407},
+  {"id":"P404","name":"P404","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.621,"fy":0.407},
+  {"id":"P405","name":"P405","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.740,"fy":0.407}
 
 ]

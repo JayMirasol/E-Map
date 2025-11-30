@@ -843,4 +843,53 @@ class CampusProvider with ChangeNotifier {
     await _persist();
     notifyListeners();
   }
+
+  // --------- Campus 2D Map Routes ---------
+
+  /// Save a manual route for the 2D campus map
+  Future<void> saveCampusManualRoute(
+    String startLocationId,
+    String destinationLocationId,
+    List<Offset> points,
+  ) async {
+    final key = '$startLocationId->$destinationLocationId';
+    final reverseKey = '$destinationLocationId->$startLocationId';
+
+    final pointsJson = points.map((p) => {'fx': p.dx, 'fy': p.dy}).toList();
+
+    _manualRoutes[key] = [
+      {'points': pointsJson},
+    ];
+
+    // Save reverse route
+    final reversePointsJson = points.reversed
+        .map((p) => {'fx': p.dx, 'fy': p.dy})
+        .toList();
+
+    _manualRoutes[reverseKey] = [
+      {'points': reversePointsJson},
+    ];
+
+    await LocalStore.writeManualRoutes(_manualRoutes);
+    notifyListeners();
+  }
+
+  /// Get campus routes content for exporting
+  Future<String?> getCampusRoutesContent() async {
+    try {
+      // Filter out floor-specific routes and only get campus-wide routes
+      final campusRoutes = <String, dynamic>{};
+      _manualRoutes.forEach((key, value) {
+        // Campus routes don't have floor prefix (e.g., "1:" or "2:")
+        if (!key.contains(RegExp(r'^\d+:'))) {
+          campusRoutes[key] = value;
+        }
+      });
+
+      return jsonEncode(campusRoutes);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error getting campus routes content: $e');
+      return null;
+    }
+  }
 }

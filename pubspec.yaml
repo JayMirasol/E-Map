@@ -46,6 +46,9 @@ flutter:
   assets:
     - assets/data/
     - assets/images/
+    - assets/images/NGO BUILDING/GROUNDFLOOR/
+    - assets/images/NGO BUILDING/SECOND FLOOR/
+    - assets/images/PAGCOR BUILDING/
     - assets/images/instructors/jay_mirasol.png
     - assets/images/instructors/lance_bulanadi.png
     - assets/images/instructors/prof_cruz.jpg

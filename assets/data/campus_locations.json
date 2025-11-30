@@ -1,0 +1,34 @@
+[
+  {
+    "id": "MAIN_GATE",
+    "name": "Main Gate",
+    "type": "entrance",
+    "fx": 0.200,
+    "fy": 0.891,
+    "description": "Main entrance to the campus"
+  },
+  {
+    "id": "MAIN_BUILDING",
+    "name": "Main Building",
+    "type": "building",
+    "fx": 0.457,
+    "fy": 0.606,
+    "description": "1st-4th-floor main academic building"
+  },
+  {
+    "id": "NGO_BUILDING",
+    "name": "NGO Building",
+    "type": "building",
+    "fx": 0.160,
+    "fy": 0.261,
+    "description": "NGO"
+  },
+  {
+    "id": "PAGCOR_BUILDING",
+    "name": "PAGCOR Building",
+    "type": "building",
+    "fx": 0.337,
+    "fy": 0.130,
+    "description": "building facilities"
+  }
+]

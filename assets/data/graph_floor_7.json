@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "floor": 7,
+    "building": "PAGCOR",
+    "title": "PAGCOR Building - 1st Floor Graph",
+    "coordinate_space": {
+      "width": 1000,
+      "height": 1000,
+      "units": "px"
+    },
+    "notes": "PAGCOR Building 1st Floor. Use long-press on the map to get coordinates and create manual routes."
+  },
+  "nodes": {
+    "PAGCOR_1F_ENTRANCE": {
+      "x": 500,
+      "y": 500,
+      "type": "corridor",
+      "fx": 0.5,
+      "fy": 0.5
+    }
+  },
+  "edges": {}
+}

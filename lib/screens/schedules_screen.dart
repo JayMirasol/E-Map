@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
 import '../core/routes.dart';
 import '../models/schedule.dart';
+import '../models/room.dart';
 import 'floor_map_screen.dart';
 
 class SchedulesScreen extends StatefulWidget {
@@ -922,101 +923,16 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
       return;
     }
 
-    // Get all rooms from all floors, excluding waypoints, grouped by floor
-    final allRooms =
-        widget.provider.rooms
-            .where((r) => r.type != 'waypoint' && r.floor != null)
-            .toList()
-          ..sort((a, b) {
-            final floorCompare = a.floor!.compareTo(b.floor!);
-            if (floorCompare != 0) return floorCompare;
-            return a.name.compareTo(b.name);
-          });
-
-    // Group rooms by floor
-    final Map<int, List<dynamic>> roomsByFloor = {};
-    for (final r in allRooms) {
-      roomsByFloor.putIfAbsent(r.floor!, () => []).add(r);
-    }
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Select Your Current Location'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: allRooms.isEmpty
-              ? const Text('No rooms available.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount:
-                      roomsByFloor.length + allRooms.length, // headers + rooms
-                  itemBuilder: (_, index) {
-                    int itemsSoFar = 0;
-
-                    // Calculate which floor and item we're at
-                    for (final floor in roomsByFloor.keys.toList()..sort()) {
-                      if (index == itemsSoFar) {
-                        // Floor header
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 16,
-                          ),
-                          color: Colors.green[100],
-                          child: Text(
-                            'Floor $floor',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green[900],
-                              fontSize: 16,
-                            ),
-                          ),
-                        );
-                      }
-                      itemsSoFar++;
-
-                      final roomsOnFloor = roomsByFloor[floor]!;
-                      final roomIndex = index - itemsSoFar;
-
-                      if (roomIndex >= 0 && roomIndex < roomsOnFloor.length) {
-                        final r = roomsOnFloor[roomIndex];
-                        final isSelected = _selectedStartRoomId == r.id;
-                        return ListTile(
-                          selected: isSelected,
-                          leading: Icon(
-                            isSelected
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : null,
-                          ),
-                          title: Text(r.name),
-                          subtitle: Text('Floor ${r.floor}'),
-                          onTap: () {
-                            setState(() {
-                              _selectedStartRoomId = r.id;
-                            });
-                            Navigator.of(ctx).pop();
-                          },
-                        );
-                      }
-
-                      itemsSoFar += roomsOnFloor.length;
-                    }
-
-                    return const SizedBox.shrink();
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
+      builder: (ctx) => _StartLocationDialog(
+        provider: widget.provider,
+        selectedStartRoomId: _selectedStartRoomId,
+        onRoomSelected: (roomId) {
+          setState(() {
+            _selectedStartRoomId = roomId;
+          });
+        },
       ),
     );
   }
@@ -1073,6 +989,31 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
         floorTitle = '4th Floor';
         imagePath = 'assets/images/4TH FLOOR.jpg';
         break;
+      case 5:
+        floorTitle = 'NGO Building - Ground Floor';
+        imagePath =
+            'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+        break;
+      case 6:
+        floorTitle = 'NGO Building - 2nd Floor';
+        imagePath = 'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+        break;
+      case 7:
+        floorTitle = 'PAGCOR Building - 1st Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+        break;
+      case 8:
+        floorTitle = 'PAGCOR Building - 2nd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+        break;
+      case 9:
+        floorTitle = 'PAGCOR Building - 3rd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+        break;
+      case 10:
+        floorTitle = 'PAGCOR Building - 4th Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+        break;
       default:
         Navigator.pushNamed(context, AppRoutes.mapSelection);
         return;
@@ -1089,6 +1030,211 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
           initialDestinationRoomId: destRoomId,
         ),
       ),
+    );
+  }
+}
+
+// Start Location Dialog with search functionality
+class _StartLocationDialog extends StatefulWidget {
+  final dynamic provider;
+  final String? selectedStartRoomId;
+  final Function(String) onRoomSelected;
+
+  const _StartLocationDialog({
+    required this.provider,
+    required this.selectedStartRoomId,
+    required this.onRoomSelected,
+  });
+
+  @override
+  State<_StartLocationDialog> createState() => _StartLocationDialogState();
+}
+
+class _StartLocationDialogState extends State<_StartLocationDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Get all rooms from all floors, excluding waypoints
+    final List<Room> allRooms = widget.provider.rooms
+        .where((r) => r.type != 'waypoint' && r.floor != null)
+        .cast<Room>()
+        .toList();
+
+    // Apply search filter
+    List<Room> filteredRooms = allRooms;
+    if (_searchQuery.isNotEmpty) {
+      filteredRooms = allRooms.where((r) {
+        final roomName = r.name.toLowerCase();
+        final roomType = r.type.toLowerCase();
+        final query = _searchQuery.toLowerCase();
+        return roomName.contains(query) || roomType.contains(query);
+      }).toList();
+    }
+
+    // Sort by floor, then by name
+    filteredRooms.sort((a, b) {
+      final floorCompare = a.floor!.compareTo(b.floor!);
+      if (floorCompare != 0) return floorCompare;
+      return a.name.compareTo(b.name);
+    });
+
+    // Group rooms by floor
+    final Map<int, List<Room>> roomsByFloor = {};
+    for (final r in filteredRooms) {
+      roomsByFloor.putIfAbsent(r.floor!, () => []).add(r);
+    }
+
+    return AlertDialog(
+      title: const Text('Select Your Current Location'),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 450,
+        child: Column(
+          children: [
+            // Search field
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search rooms...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            // Room list
+            Expanded(
+              child: filteredRooms.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchQuery.isEmpty
+                            ? 'No rooms available.'
+                            : 'No rooms found matching "$_searchQuery"',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: (roomsByFloor.length + filteredRooms.length)
+                          .toInt(),
+                      itemBuilder: (_, index) {
+                        int itemsSoFar = 0;
+
+                        // Calculate which floor and item we're at
+                        for (final floor
+                            in roomsByFloor.keys.toList()..sort()) {
+                          if (index == itemsSoFar) {
+                            // Floor header with building name
+                            String floorLabel;
+                            if (floor <= 4) {
+                              floorLabel = 'Floor $floor - Main Building';
+                            } else if (floor <= 6) {
+                              floorLabel = floor == 5
+                                  ? 'NGO Building - Ground Floor'
+                                  : 'NGO Building - 2nd Floor';
+                            } else {
+                              final pagcorFloor = floor - 6;
+                              floorLabel =
+                                  'PAGCOR Building - ${pagcorFloor}${pagcorFloor == 1
+                                      ? 'st'
+                                      : pagcorFloor == 2
+                                      ? 'nd'
+                                      : pagcorFloor == 3
+                                      ? 'rd'
+                                      : 'th'} Floor';
+                            }
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 16,
+                              ),
+                              margin: const EdgeInsets.only(bottom: 4),
+                              color: Colors.green[100],
+                              child: Text(
+                                floorLabel,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green[900],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            );
+                          }
+                          itemsSoFar++;
+
+                          final roomsOnFloor = roomsByFloor[floor]!;
+                          final roomIndex = index - itemsSoFar;
+
+                          if (roomIndex >= 0 &&
+                              roomIndex < roomsOnFloor.length) {
+                            final r = roomsOnFloor[roomIndex];
+                            final isSelected =
+                                widget.selectedStartRoomId == r.id;
+                            return ListTile(
+                              selected: isSelected,
+                              leading: Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                              ),
+                              title: Text(r.name),
+                              subtitle: Text('Floor ${r.floor}'),
+                              onTap: () {
+                                widget.onRoomSelected(r.id);
+                                Navigator.of(context).pop();
+                              },
+                            );
+                          }
+
+                          itemsSoFar += roomsOnFloor.length;
+                        }
+
+                        return const SizedBox.shrink();
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }

@@ -24,6 +24,12 @@ class AppRoutes {
   static const floor2 = '/floor2';
   static const floor3 = '/floor3';
   static const floor4 = '/floor4';
+  static const ngoGround = '/ngo-ground';
+  static const ngo2nd = '/ngo-2nd';
+  static const pagcor1st = '/pagcor-1st';
+  static const pagcor2nd = '/pagcor-2nd';
+  static const pagcor3rd = '/pagcor-3rd';
+  static const pagcor4th = '/pagcor-4th';
   static const rooms = '/rooms';
   static const schedules = '/schedules';
   static const faculty = '/faculty';
@@ -58,6 +64,36 @@ class AppRoutes {
       floorNumber: 4,
       floorTitle: '4th Floor',
       imagePath: 'assets/images/4TH FLOOR.jpg',
+    ),
+    ngoGround: (_) => const FloorMapScreen(
+      floorNumber: 5,
+      floorTitle: 'NGO Building - Ground Floor',
+      imagePath: 'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg',
+    ),
+    ngo2nd: (_) => const FloorMapScreen(
+      floorNumber: 6,
+      floorTitle: 'NGO Building - 2nd Floor',
+      imagePath: 'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg',
+    ),
+    pagcor1st: (_) => const FloorMapScreen(
+      floorNumber: 7,
+      floorTitle: 'PAGCOR Building - 1st Floor',
+      imagePath: 'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg',
+    ),
+    pagcor2nd: (_) => const FloorMapScreen(
+      floorNumber: 8,
+      floorTitle: 'PAGCOR Building - 2nd Floor',
+      imagePath: 'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg',
+    ),
+    pagcor3rd: (_) => const FloorMapScreen(
+      floorNumber: 9,
+      floorTitle: 'PAGCOR Building - 3rd Floor',
+      imagePath: 'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg',
+    ),
+    pagcor4th: (_) => const FloorMapScreen(
+      floorNumber: 10,
+      floorTitle: 'PAGCOR Building - 4th Floor',
+      imagePath: 'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg',
     ),
     rooms: (_) => const RoomsScreen(),
     schedules: (_) => const SchedulesScreen(),

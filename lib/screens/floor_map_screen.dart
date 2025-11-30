@@ -227,7 +227,12 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       final destRoom = provider.roomById(_destinationRoomId!);
       final destRoomName = destRoom?.name ?? 'destination';
 
-      _showDestinationReachedDialog(destRoomName);
+      // Wait 5 seconds before showing dialog to let users view the path
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) {
+          _showDestinationReachedDialog(destRoomName);
+        }
+      });
       return;
     }
 
@@ -240,8 +245,12 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     _pendingNextFloor = nextFloor;
     _pendingDestRoomName = destRoomName;
 
-    // Show dialog requiring user to click Continue
-    _showFloorTransitionDialog(nextFloor, destRoomName);
+    // Wait 5 seconds before showing dialog to let users view the path
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted) {
+        _showFloorTransitionDialog(nextFloor, destRoomName);
+      }
+    });
   }
 
   void _showDestinationReachedDialog(String destRoomName) {
@@ -407,6 +416,57 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     _continuePromptTimer?.cancel();
     _countdownTimer?.cancel();
 
+    // Get floor title and image path based on floor number
+    String floorTitle;
+    String imagePath;
+
+    switch (nextFloor) {
+      case 1:
+        floorTitle = 'Ground Floor';
+        imagePath = 'assets/images/1ST FLOOR.jpg';
+        break;
+      case 2:
+        floorTitle = '2nd Floor: Main Building';
+        imagePath = 'assets/images/2ND FLOOR.jpg';
+        break;
+      case 3:
+        floorTitle = '3rd Floor';
+        imagePath = 'assets/images/3RD FLOOR.jpg';
+        break;
+      case 4:
+        floorTitle = '4th Floor';
+        imagePath = 'assets/images/4TH FLOOR.jpg';
+        break;
+      case 5:
+        floorTitle = 'NGO Building - Ground Floor';
+        imagePath =
+            'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+        break;
+      case 6:
+        floorTitle = 'NGO Building - 2nd Floor';
+        imagePath = 'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+        break;
+      case 7:
+        floorTitle = 'PAGCOR Building - 1st Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+        break;
+      case 8:
+        floorTitle = 'PAGCOR Building - 2nd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+        break;
+      case 9:
+        floorTitle = 'PAGCOR Building - 3rd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+        break;
+      case 10:
+        floorTitle = 'PAGCOR Building - 4th Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+        break;
+      default:
+        Navigator.pushNamed(context, '/map-selection');
+        return;
+    }
+
     // Navigate to next floor
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -414,20 +474,8 @@ class _FloorMapScreenState extends State<FloorMapScreen>
         reverseTransitionDuration: const Duration(milliseconds: 400),
         pageBuilder: (_, __, ___) => FloorMapScreen(
           floorNumber: nextFloor,
-          floorTitle: nextFloor == 1
-              ? 'Ground Floor'
-              : nextFloor == 2
-              ? '2nd Floor: Main Building'
-              : nextFloor == 3
-              ? '3rd Floor'
-              : '4th Floor',
-          imagePath: nextFloor == 1
-              ? 'assets/images/1ST FLOOR.jpg'
-              : nextFloor == 2
-              ? 'assets/images/2ND FLOOR.jpg'
-              : nextFloor == 3
-              ? 'assets/images/3RD FLOOR.jpg'
-              : 'assets/images/4TH FLOOR.jpg',
+          floorTitle: floorTitle,
+          imagePath: imagePath,
           initialStartRoomId: _startRoomId,
           initialDestinationRoomId: _destinationRoomId,
         ),
@@ -1384,9 +1432,11 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                 const SizedBox(height: 16),
                                                 Wrap(
                                                   spacing: 8,
-                                                  children: [1, 2, 3, 4].map((
-                                                    f,
+                                                  runSpacing: 8,
+                                                  children: List.generate(10, (
+                                                    index,
                                                   ) {
+                                                    final f = index + 1;
                                                     final points = provider
                                                         .draftPointsForFloor(f);
                                                     final isRequired =
@@ -1397,6 +1447,90 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                         f == widget.floorNumber;
                                                     final hasPath =
                                                         points.isNotEmpty;
+
+                                                    // Get floor title
+                                                    String floorTitle;
+                                                    String imagePath;
+
+                                                    switch (f) {
+                                                      case 1:
+                                                        floorTitle =
+                                                            'Ground Floor';
+                                                        imagePath =
+                                                            'assets/images/1ST FLOOR.jpg';
+                                                        break;
+                                                      case 2:
+                                                        floorTitle =
+                                                            '2nd Floor: Main Building';
+                                                        imagePath =
+                                                            'assets/images/2ND FLOOR.jpg';
+                                                        break;
+                                                      case 3:
+                                                        floorTitle =
+                                                            '3rd Floor';
+                                                        imagePath =
+                                                            'assets/images/3RD FLOOR.jpg';
+                                                        break;
+                                                      case 4:
+                                                        floorTitle =
+                                                            '4th Floor';
+                                                        imagePath =
+                                                            'assets/images/4TH FLOOR.jpg';
+                                                        break;
+                                                      case 5:
+                                                        floorTitle =
+                                                            'NGO Building - Ground Floor';
+                                                        imagePath =
+                                                            'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+                                                        break;
+                                                      case 6:
+                                                        floorTitle =
+                                                            'NGO Building - 2nd Floor';
+                                                        imagePath =
+                                                            'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+                                                        break;
+                                                      case 7:
+                                                        floorTitle =
+                                                            'PAGCOR Building - 1st Floor';
+                                                        imagePath =
+                                                            'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+                                                        break;
+                                                      case 8:
+                                                        floorTitle =
+                                                            'PAGCOR Building - 2nd Floor';
+                                                        imagePath =
+                                                            'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+                                                        break;
+                                                      case 9:
+                                                        floorTitle =
+                                                            'PAGCOR Building - 3rd Floor';
+                                                        imagePath =
+                                                            'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+                                                        break;
+                                                      case 10:
+                                                        floorTitle =
+                                                            'PAGCOR Building - 4th Floor';
+                                                        imagePath =
+                                                            'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+                                                        break;
+                                                      default:
+                                                        floorTitle = 'Floor $f';
+                                                        imagePath = '';
+                                                    }
+
+                                                    // Get building/floor label for button
+                                                    String buttonLabel;
+                                                    if (f <= 4) {
+                                                      buttonLabel = 'Floor $f';
+                                                    } else if (f <= 6) {
+                                                      buttonLabel = f == 5
+                                                          ? 'NGO GF'
+                                                          : 'NGO 2F';
+                                                    } else {
+                                                      final pagcorFloor = f - 6;
+                                                      buttonLabel =
+                                                          'PAG $pagcorFloor';
+                                                    }
 
                                                     return OutlinedButton(
                                                       onPressed: isCurrent
@@ -1413,21 +1547,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                                     floorNumber:
                                                                         f,
                                                                     floorTitle:
-                                                                        f == 1
-                                                                        ? 'Ground Floor'
-                                                                        : f == 2
-                                                                        ? '2nd Floor: Main Building'
-                                                                        : f == 3
-                                                                        ? '3rd Floor'
-                                                                        : '4th Floor',
+                                                                        floorTitle,
                                                                     imagePath:
-                                                                        f == 1
-                                                                        ? 'assets/images/1ST FLOOR.jpg'
-                                                                        : f == 2
-                                                                        ? 'assets/images/2ND FLOOR.jpg'
-                                                                        : f == 3
-                                                                        ? 'assets/images/3RD FLOOR.jpg'
-                                                                        : 'assets/images/4TH FLOOR.jpg',
+                                                                        imagePath,
                                                                     initialStartRoomId:
                                                                         _startRoomId,
                                                                     initialDestinationRoomId:
@@ -1479,7 +1601,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                               const SizedBox(
                                                                 width: 4,
                                                               ),
-                                                              Text('Floor $f'),
+                                                              Text(buttonLabel),
                                                             ],
                                                           ),
                                                           if (hasPath)
@@ -1521,7 +1643,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                         ],
                                                       ),
                                                     );
-                                                  }).toList(),
+                                                  }),
                                                 ),
                                                 const SizedBox(height: 12),
                                               ],
@@ -2132,6 +2254,22 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
       }).toList();
     }
 
+    // Sort rooms: current floor first, then by floor number
+    selectableRooms.sort((a, b) {
+      // Current floor rooms come first
+      if (a.floor == widget.currentFloor && b.floor != widget.currentFloor) {
+        return -1;
+      }
+      if (b.floor == widget.currentFloor && a.floor != widget.currentFloor) {
+        return 1;
+      }
+      // Then sort by floor number
+      final floorCompare = a.floor!.compareTo(b.floor!);
+      if (floorCompare != 0) return floorCompare;
+      // Finally sort by name
+      return a.name.compareTo(b.name);
+    });
+
     if (widget.isStartSelection) {
       // For start selection: only show current floor rooms, disable others
       return MediaQuery.removeViewInsets(
@@ -2287,8 +2425,15 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
         }
       }
 
-      // Sort floors
-      final sortedFloors = roomsByFloor.keys.toList()..sort();
+      // Sort floors: current floor first, then ascending order
+      final sortedFloors = roomsByFloor.keys.toList()
+        ..sort((a, b) {
+          // Current floor comes first
+          if (a == widget.currentFloor && b != widget.currentFloor) return -1;
+          if (b == widget.currentFloor && a != widget.currentFloor) return 1;
+          // Other floors in ascending order
+          return a.compareTo(b);
+        });
 
       return MediaQuery.removeViewInsets(
         context: context,
@@ -2458,6 +2603,18 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
         return '3rd Floor';
       case 4:
         return '4th Floor';
+      case 5:
+        return 'NGO Building - Ground Floor';
+      case 6:
+        return 'NGO Building - 2nd Floor';
+      case 7:
+        return 'PAGCOR Building - 1st Floor';
+      case 8:
+        return 'PAGCOR Building - 2nd Floor';
+      case 9:
+        return 'PAGCOR Building - 3rd Floor';
+      case 10:
+        return 'PAGCOR Building - 4th Floor';
       default:
         return 'Floor $floor';
     }
