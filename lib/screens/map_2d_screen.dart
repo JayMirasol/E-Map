@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
+import '../models/room.dart';
+import 'floor_map_screen.dart';
 
 // Model for campus locations
 class CampusLocation {
@@ -45,7 +47,20 @@ class CampusLocation {
 }
 
 class Map2DScreen extends StatefulWidget {
-  const Map2DScreen({super.key});
+  final String? startLocationId;
+  final String? destinationLocationId;
+  final bool autoShowRoute;
+  final String? startRoomId; // For floor navigation context
+  final String? destinationRoomId; // For floor navigation context
+
+  const Map2DScreen({
+    super.key,
+    this.startLocationId,
+    this.destinationLocationId,
+    this.autoShowRoute = false,
+    this.startRoomId,
+    this.destinationRoomId,
+  });
 
   @override
   State<Map2DScreen> createState() => _Map2DScreenState();
@@ -61,6 +76,10 @@ class _Map2DScreenState extends State<Map2DScreen>
   String? _startLocationId;
   String? _destinationLocationId;
   List<Offset>? _currentRoute;
+
+  // Room context for floor navigation
+  String? _startRoomId;
+  String? _destinationRoomId;
 
   // Manual route editing
   bool _editMode = false;
@@ -147,6 +166,103 @@ class _Map2DScreenState extends State<Map2DScreen>
     });
 
     _loadCampusData();
+
+    // Initialize room context from widget
+    _startRoomId = widget.startRoomId;
+    _destinationRoomId = widget.destinationRoomId;
+
+    // If room IDs are provided, set up manual route mode for campus navigation
+    if (_startRoomId != null && _destinationRoomId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initializeCampusManualRoute();
+      });
+    }
+    // If auto-show route is enabled and we have start/destination, display it after loading
+    else if (widget.autoShowRoute &&
+        widget.startLocationId != null &&
+        widget.destinationLocationId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoDisplayRoute();
+      });
+    }
+  }
+
+  void _initializeCampusManualRoute() async {
+    // Wait for campus data to load
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    final provider = context.read<CampusProvider>();
+    final startRoom = provider.rooms.firstWhere(
+      (r) => r.id == _startRoomId,
+      orElse: () => Room(id: '', name: '', type: '', lat: 0, lng: 0, floor: 0),
+    );
+    final destRoom = provider.rooms.firstWhere(
+      (r) => r.id == _destinationRoomId,
+      orElse: () => Room(id: '', name: '', type: '', lat: 0, lng: 0, floor: 0),
+    );
+
+    if (startRoom.id.isEmpty || destRoom.id.isEmpty) return;
+
+    // Determine building IDs for campus locations
+    String? startBuildingId;
+    String? destBuildingId;
+
+    final startBuilding = startRoom.building ?? '';
+    final destBuilding = destRoom.building ?? '';
+
+    if (startBuilding == 'MAIN') {
+      startBuildingId = 'MAIN_BUILDING';
+    } else if (startBuilding == 'NGO') {
+      startBuildingId = 'NGO_BUILDING';
+    } else if (startBuilding == 'PAGCOR') {
+      startBuildingId = 'PAGCOR_BUILDING';
+    }
+
+    if (destBuilding == 'MAIN') {
+      destBuildingId = 'MAIN_BUILDING';
+    } else if (destBuilding == 'NGO') {
+      destBuildingId = 'NGO_BUILDING';
+    } else if (destBuilding == 'PAGCOR') {
+      destBuildingId = 'PAGCOR_BUILDING';
+    }
+
+    if (startBuildingId == null || destBuildingId == null) return;
+
+    // Check if manual route already exists
+    final routeKey = '$startBuildingId->$destBuildingId';
+    final existingRoute = _routes[routeKey];
+
+    setState(() {
+      _startLocationId = startBuildingId;
+      _destinationLocationId = destBuildingId;
+
+      if (existingRoute != null) {
+        // Route exists, display it
+        _currentRoute = existingRoute;
+        _pathAnimationController.forward(from: 0.0);
+      } else {
+        // No route, enable manual editing
+        _editMode = true;
+        _manualRoutePoints.clear();
+      }
+    });
+  }
+
+  void _autoDisplayRoute() async {
+    // Wait for campus data to load
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    setState(() {
+      _startLocationId = widget.startLocationId;
+      _destinationLocationId = widget.destinationLocationId;
+    });
+
+    // Trigger route computation and display
+    _computeRoute();
   }
 
   @override
@@ -471,6 +587,188 @@ class _Map2DScreenState extends State<Map2DScreen>
     );
 
     _pathAnimationController.forward(from: 0.0);
+  }
+
+  void _showFloorSwitcher() {
+    if (_startRoomId == null || _destinationRoomId == null) return;
+
+    final provider = context.read<CampusProvider>();
+    final startRoom = provider.rooms.firstWhere(
+      (r) => r.id == _startRoomId,
+      orElse: () => Room(id: '', name: '', type: '', lat: 0, lng: 0, floor: 0),
+    );
+    final destRoom = provider.rooms.firstWhere(
+      (r) => r.id == _destinationRoomId,
+      orElse: () => Room(id: '', name: '', type: '', lat: 0, lng: 0, floor: 0),
+    );
+
+    if (startRoom.id.isEmpty || destRoom.id.isEmpty) return;
+    if (startRoom.floor == null || destRoom.floor == null) return;
+
+    // Determine which floors are needed
+    final startFloor = startRoom.floor!;
+    final destFloor = destRoom.floor!;
+    final startBuilding = startRoom.building ?? '';
+    final destBuilding = destRoom.building ?? '';
+
+    List<int> requiredFloors = [];
+    String buildingLabel = '';
+
+    // If cross-building, show destination building floors
+    if (startBuilding != destBuilding && destBuilding.isNotEmpty) {
+      buildingLabel = destBuilding;
+      if (destBuilding == 'NGO') {
+        requiredFloors = destFloor >= 5
+            ? [5, 6].where((f) => f <= destFloor).toList()
+            : [5, 6].where((f) => f >= destFloor).toList();
+      } else if (destBuilding == 'PAGCOR') {
+        requiredFloors = destFloor >= 7
+            ? List.generate(destFloor - 6, (i) => i + 7)
+            : List.generate(11 - destFloor, (i) => destFloor + i);
+      } else {
+        // MAIN building
+        requiredFloors = destFloor >= 1
+            ? List.generate(destFloor, (i) => i + 1)
+            : [destFloor];
+      }
+    } else {
+      // Same building, show floors between start and destination
+      buildingLabel = startBuilding;
+      final minFloor = startFloor < destFloor ? startFloor : destFloor;
+      final maxFloor = startFloor > destFloor ? startFloor : destFloor;
+      requiredFloors = List.generate(
+        maxFloor - minFloor + 1,
+        (i) => minFloor + i,
+      );
+    }
+
+    if (requiredFloors.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.3,
+        maxChildSize: 0.7,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Continue to $buildingLabel Floors',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: requiredFloors.length,
+                  itemBuilder: (context, index) {
+                    final floor = requiredFloors[index];
+                    final floorName = floor == 1
+                        ? 'Ground Floor'
+                        : 'Floor $floor';
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue,
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      title: Text(floorName),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.pop(context);
+
+                        // Generate floor title and image path based on floor number
+                        String floorTitle;
+                        String imagePath;
+
+                        if (floor == 1) {
+                          floorTitle = 'Main Building - Ground Floor';
+                          imagePath =
+                              'assets/images/MAIN BUILDING/GROUND FLOOR/MAIN BUILDING GROUND FLOOR.jpg';
+                        } else if (floor == 2) {
+                          floorTitle = 'Main Building - 2nd Floor';
+                          imagePath =
+                              'assets/images/MAIN BUILDING/SECOND FLOOR/MAIN BUILDING 2ND FLOOR.jpg';
+                        } else if (floor == 3) {
+                          floorTitle = 'Main Building - 3rd Floor';
+                          imagePath =
+                              'assets/images/MAIN BUILDING/THIRD FLOOR/MAIN BUILDING 3RD FLOOR.jpg';
+                        } else if (floor == 4) {
+                          floorTitle = 'Main Building - 4th Floor';
+                          imagePath =
+                              'assets/images/MAIN BUILDING/FOURTH FLOOR/MAIN BUILDING 4TH FLOOR.jpg';
+                        } else if (floor == 5) {
+                          floorTitle = 'NGO Building - Ground Floor';
+                          imagePath =
+                              'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+                        } else if (floor == 6) {
+                          floorTitle = 'NGO Building - 2nd Floor';
+                          imagePath =
+                              'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+                        } else if (floor == 7) {
+                          floorTitle = 'PAGCOR Building - 1st Floor';
+                          imagePath =
+                              'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+                        } else if (floor == 8) {
+                          floorTitle = 'PAGCOR Building - 2nd Floor';
+                          imagePath =
+                              'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+                        } else if (floor == 9) {
+                          floorTitle = 'PAGCOR Building - 3rd Floor';
+                          imagePath =
+                              'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+                        } else if (floor == 10) {
+                          floorTitle = 'PAGCOR Building - 4th Floor';
+                          imagePath =
+                              'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+                        } else {
+                          floorTitle = 'Floor $floor';
+                          imagePath = '';
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FloorMapScreen(
+                              floorNumber: floor,
+                              floorTitle: floorTitle,
+                              imagePath: imagePath,
+                              initialStartRoomId: _startRoomId,
+                              initialDestinationRoomId: _destinationRoomId,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -864,6 +1162,23 @@ class _Map2DScreenState extends State<Map2DScreen>
                                       ),
                                     ),
                                   ],
+                                ),
+                              ],
+                              // Floor switcher button when in cross-building context
+                              if (_startRoomId != null &&
+                                  _destinationRoomId != null) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _showFloorSwitcher,
+                                    icon: const Icon(Icons.stairs, size: 16),
+                                    label: const Text('Switch to Floor'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ],

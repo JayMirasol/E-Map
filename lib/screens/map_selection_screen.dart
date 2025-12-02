@@ -181,59 +181,66 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Select a map to navigate',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-                textAlign: TextAlign.center,
+
+              // Main Building Section
+              _buildSectionHeader(
+                title: 'Main Building',
+                icon: Icons.business,
+                color: Colors.blue,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'Ground Floor - Main Building',
+                title: 'Ground Floor',
                 subtitle: 'First floor layout and rooms',
                 imagePath: 'assets/images/1ST FLOOR.jpg',
                 routeName: '/floor1',
                 floor: 1,
                 index: 0,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: '2nd Floor - Main Building',
+                title: '2nd Floor',
                 subtitle: 'Second floor layout and rooms',
                 imagePath: 'assets/images/2ND FLOOR.jpg',
                 routeName: '/floor2',
                 floor: 2,
                 index: 1,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: '3rd Floor - Main Building',
+                title: '3rd Floor',
                 subtitle: 'Third floor layout and rooms',
                 imagePath: 'assets/images/3RD FLOOR.jpg',
                 routeName: '/floor3',
                 floor: 3,
                 index: 2,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: '4th Floor - Main Building',
+                title: '4th Floor',
                 subtitle: 'Fourth floor layout and rooms',
                 imagePath: 'assets/images/4TH FLOOR.jpg',
                 routeName: '/floor4',
                 floor: 4,
                 index: 3,
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 24),
+
+              // NGO Building Section
+              _buildSectionHeader(
+                title: 'NGO Building',
+                icon: Icons.apartment,
+                color: Colors.orange,
+              ),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'NGO Building - Ground Floor',
+                title: 'Ground Floor',
                 subtitle: 'NGO Building ground floor rooms',
                 imagePath:
                     'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg',
@@ -241,10 +248,10 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 floor: 5,
                 index: 4,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'NGO Building - 2nd Floor',
+                title: '2nd Floor',
                 subtitle: 'NGO Building second floor rooms',
                 imagePath:
                     'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg',
@@ -252,10 +259,19 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 floor: 6,
                 index: 5,
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 24),
+
+              // PAGCOR Building Section
+              _buildSectionHeader(
+                title: 'PAGCOR Building',
+                icon: Icons.domain,
+                color: Colors.purple,
+              ),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'PAGCOR Building - 1st Floor',
+                title: '1st Floor',
                 subtitle: 'PAGCOR Building first floor rooms',
                 imagePath:
                     'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg',
@@ -263,20 +279,20 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 floor: 7,
                 index: 6,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'PAGCOR Building - 2nd Floor',
+                title: '2nd Floor',
                 subtitle: 'PAGCOR Building second floor rooms',
                 imagePath: 'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg',
                 routeName: '/pagcor-2nd',
                 floor: 8,
                 index: 7,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'PAGCOR Building - 3rd Floor',
+                title: '3rd Floor',
                 subtitle: 'PAGCOR Building third floor rooms',
                 imagePath:
                     'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg',
@@ -284,10 +300,10 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 floor: 9,
                 index: 8,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'PAGCOR Building - 4th Floor',
+                title: '4th Floor',
                 subtitle: 'PAGCOR Building fourth floor rooms',
                 imagePath:
                     'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg',
@@ -295,21 +311,86 @@ class _MapSelectionScreenState extends State<MapSelectionScreen>
                 floor: 10,
                 index: 9,
               ),
+
               const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 16),
+
+              // Campus Site Plan Section
+              _buildSectionHeader(
+                title: 'CCA Campus Site Plan',
+                icon: Icons.map,
+                color: Colors.green,
+              ),
+              const SizedBox(height: 12),
               _buildMapCard(
                 context: context,
-                title: 'CCA Campus Site Plan',
-                subtitle: 'Complete campus overview',
+                title: 'Campus Overview',
+                subtitle: 'Complete campus overview (Map2D)',
                 imagePath: 'assets/images/SITE-PLAN-CCA-Model-1.png',
                 routeName: '/map2d',
                 floor: null,
                 index: 10,
               ),
+              const SizedBox(height: 12),
+              _buildMapCard(
+                context: context,
+                title: 'Campus Site Plan (Floor-Based)',
+                subtitle: 'Cross-building navigation compatible',
+                imagePath: 'assets/images/SITE-PLAN-CCA-Model-1.png',
+                routeName: '/floor-1',
+                floor: -1,
+                index: 11,
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String title,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

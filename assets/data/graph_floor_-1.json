@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "id": "MAIN_GATE",
+      "fx": 0.200,
+      "fy": 0.891
+    },
+    {
+      "id": "MAIN_BUILDING",
+      "fx": 0.457,
+      "fy": 0.606
+    },
+    {
+      "id": "NGO_BUILDING",
+      "fx": 0.160,
+      "fy": 0.261
+    },
+    {
+      "id": "PAGCOR_BUILDING",
+      "fx": 0.337,
+      "fy": 0.130
+    }
+  ],
+  "edges": [
+    {
+      "from": "MAIN_GATE",
+      "to": "MAIN_BUILDING",
+      "cost": 1.0
+    },
+    {
+      "from": "MAIN_BUILDING",
+      "to": "NGO_BUILDING",
+      "cost": 1.0
+    },
+    {
+      "from": "MAIN_BUILDING",
+      "to": "PAGCOR_BUILDING",
+      "cost": 1.0
+    },
+    {
+      "from": "NGO_BUILDING",
+      "to": "PAGCOR_BUILDING",
+      "cost": 1.0
+    }
+  ]
+}

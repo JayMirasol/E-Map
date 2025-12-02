@@ -22,6 +22,7 @@ class CampusProvider with ChangeNotifier {
   List<Room> get rooms => _rooms;
   List<Schedule> get schedules => _schedules;
   String? get selectedRoomId => _selectedRoomId;
+  Map<String, dynamic> get manualRoutes => _manualRoutes;
 
   static const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -594,12 +595,50 @@ class CampusProvider with ChangeNotifier {
 
   // ---------- Cross-floor routing (stairs/elevators) ----------
 
+  /// Get the building identifier for a room
+  String? _getBuildingForRoom(Room room) {
+    return room.building;
+  }
+
+  /// Get the ground floor number for a given building
+  int _getGroundFloorForBuilding(String building) {
+    switch (building) {
+      case 'MAIN':
+        return 1;
+      case 'NGO':
+        return 5;
+      case 'PAGCOR':
+        return 7;
+      default:
+        return 1;
+    }
+  }
+
+  /// Get the campus location ID for a building
+  String _getCampusLocationIdForBuilding(String building) {
+    switch (building) {
+      case 'MAIN':
+        return 'MAIN_BUILDING';
+      case 'NGO':
+        return 'NGO_BUILDING';
+      case 'PAGCOR':
+        return 'PAGCOR_BUILDING';
+      default:
+        return 'MAIN_BUILDING';
+    }
+  }
+
   /// Compute a cross-floor route from startRoomId to endRoomId.
   /// Returns an ordered list of floor-segment polylines where each segment
   /// contains fractional points (fx, fy) normalized to the corresponding
   /// floor image coordinate space.
   ///
-  /// segments: [ { 'floor': 1, 'points': [ {'fx':..,'fy':..}, ... ] }, ... ]
+  /// For cross-building navigation, this includes:
+  /// 1. Route from start room to ground floor of start building
+  /// 2. Campus site plan segment showing building-to-building path
+  /// 3. Route from ground floor of destination building to destination room
+  ///
+  /// segments: [ { 'floor': 1, 'points': [ {'fx':..,'fy':..}, ... ], 'isCampusMap': false }, ... ]
   Future<List<Map<String, dynamic>>> computeCrossFloorRoute(
     String startRoomId,
     String endRoomId, {
@@ -613,6 +652,181 @@ class CampusProvider with ChangeNotifier {
     final ef = endRoom.floor;
     if (sf == null || ef == null) return [];
 
+    final startBuilding = _getBuildingForRoom(startRoom);
+    final endBuilding = _getBuildingForRoom(endRoom);
+
+    // Check if this is cross-building navigation
+    final isCrossBuilding =
+        startBuilding != null &&
+        endBuilding != null &&
+        startBuilding != endBuilding;
+
+    if (isCrossBuilding) {
+      return await _computeCrossBuildingRoute(
+        startRoom,
+        endRoom,
+        startBuilding,
+        endBuilding,
+      );
+    }
+
+    // Same building - use existing logic
+    return await _computeSameBuildingRoute(
+      startRoom,
+      endRoom,
+      sf,
+      ef,
+      verticalPenalty,
+    );
+  }
+
+  /// Compute route across different buildings via campus site plan
+  Future<List<Map<String, dynamic>>> _computeCrossBuildingRoute(
+    Room startRoom,
+    Room endRoom,
+    String startBuilding,
+    String endBuilding,
+  ) async {
+    final segments = <Map<String, dynamic>>[];
+    final sf = startRoom.floor!;
+    final ef = endRoom.floor!;
+    final startGroundFloor = _getGroundFloorForBuilding(startBuilding);
+    final endGroundFloor = _getGroundFloorForBuilding(endBuilding);
+
+    // Step 1: Route from start room down to ground floor of start building
+    if (sf != startGroundFloor) {
+      final groundFloorSegments = await _computeSameBuildingRoute(
+        startRoom,
+        // Create a dummy room at ground floor exit point
+        Room(
+          id: '${startBuilding}_GROUND_EXIT',
+          name: '$startBuilding Ground Floor Exit',
+          type: 'waypoint',
+          lat: startRoom.lat,
+          lng: startRoom.lng,
+          floor: startGroundFloor,
+          building: startBuilding,
+          fx: 0.5,
+          fy: 0.5,
+        ),
+        sf,
+        startGroundFloor,
+        0.15,
+      );
+      segments.addAll(groundFloorSegments);
+    } else {
+      // Already on ground floor, add starting point
+      segments.add({
+        'floor': sf,
+        'points': [
+          {'fx': startRoom.fx ?? 0.5, 'fy': startRoom.fy ?? 0.5},
+        ],
+        'instruction': 'Start at ${startRoom.name} - Proceed to exit',
+      });
+    }
+
+    // Step 2: Add campus site plan segment
+    final startLocationId = _getCampusLocationIdForBuilding(startBuilding);
+    final endLocationId = _getCampusLocationIdForBuilding(endBuilding);
+
+    // Look for manual route on campus map - try both underscore and space formats
+    // (legacy routes may have used display name with space)
+    final campusRouteKey = '$startLocationId->$endLocationId';
+    var campusRoute = _manualRoutes[campusRouteKey];
+
+    // If not found with underscore, try with space (legacy format)
+    if (campusRoute == null) {
+      final legacyKey = campusRouteKey
+          .replaceAll('_BUILDING', ' BUILDING')
+          .replaceAll('_', ' ');
+      campusRoute = _manualRoutes[legacyKey];
+      if (kDebugMode && campusRoute != null) {
+        print('Found campus route with legacy key: $legacyKey');
+      }
+    }
+
+    if (kDebugMode) {
+      print('Looking for campus route: $campusRouteKey');
+      print('Campus route found: ${campusRoute != null}');
+    }
+
+    if (campusRoute is List && campusRoute.isNotEmpty) {
+      final routeData = campusRoute.first as Map;
+      segments.add({
+        'floor': -1, // Special marker for campus site plan
+        'isCampusMap': true,
+        'points': (routeData['points'] as List)
+            .map(
+              (p) => {
+                'fx': (p['fx'] as num).toDouble(),
+                'fy': (p['fy'] as num).toDouble(),
+              },
+            )
+            .toList(),
+        'instruction':
+            'Walk from $startBuilding Building to $endBuilding Building',
+        'startLocationId': startLocationId,
+        'endLocationId': endLocationId,
+      });
+    } else {
+      // No manual route found - add placeholder segment
+      if (kDebugMode) {
+        debugPrint('WARNING: No campus manual route found for $campusRouteKey');
+      }
+      segments.add({
+        'floor': -1,
+        'isCampusMap': true,
+        'points': [],
+        'instruction':
+            'Walk from $startBuilding Building to $endBuilding Building (route not defined)',
+        'startLocationId': startLocationId,
+        'endLocationId': endLocationId,
+      });
+    }
+
+    // Step 3: Route from ground floor of destination building up to destination room
+    if (ef != endGroundFloor) {
+      final destFloorSegments = await _computeSameBuildingRoute(
+        // Create a dummy room at ground floor entry point
+        Room(
+          id: '${endBuilding}_GROUND_ENTRY',
+          name: '$endBuilding Ground Floor Entry',
+          type: 'waypoint',
+          lat: endRoom.lat,
+          lng: endRoom.lng,
+          floor: endGroundFloor,
+          building: endBuilding,
+          fx: 0.5,
+          fy: 0.5,
+        ),
+        endRoom,
+        endGroundFloor,
+        ef,
+        0.15,
+      );
+      segments.addAll(destFloorSegments);
+    } else {
+      // Destination is on ground floor
+      segments.add({
+        'floor': ef,
+        'points': [
+          {'fx': endRoom.fx ?? 0.5, 'fy': endRoom.fy ?? 0.5},
+        ],
+        'instruction': 'Arrive at ${endRoom.name}',
+      });
+    }
+
+    return segments;
+  }
+
+  /// Compute route within the same building (existing logic)
+  Future<List<Map<String, dynamic>>> _computeSameBuildingRoute(
+    Room startRoom,
+    Room endRoom,
+    int sf,
+    int ef,
+    double verticalPenalty,
+  ) async {
     // Check for floor-specific manual routes
     final segments = <Map<String, dynamic>>[];
 
@@ -634,7 +848,7 @@ class CampusProvider with ChangeNotifier {
     // Try to find manual routes for each floor
     bool foundAllManualRoutes = true;
     for (final floor in floorsInRoute) {
-      final floorKey = '$floor:$startRoomId->$endRoomId';
+      final floorKey = '$floor:${startRoom.id}->${endRoom.id}';
       final manual = _manualRoutes[floorKey];
 
       if (manual is List && manual.isNotEmpty) {
@@ -669,7 +883,7 @@ class CampusProvider with ChangeNotifier {
     }
 
     // Fall back to old non-floor-specific manual route (for backward compatibility)
-    final oldKey = '$startRoomId->$endRoomId';
+    final oldKey = '${startRoom.id}->${endRoom.id}';
     final oldManual = _manualRoutes[oldKey];
     if (oldManual is List) {
       final cleaned = oldManual
@@ -693,7 +907,7 @@ class CampusProvider with ChangeNotifier {
 
     // Same-floor: reuse single-floor router for best fidelity.
     if (sf == ef) {
-      final pts = await findPathBetweenRooms(startRoomId, endRoomId);
+      final pts = await findPathBetweenRooms(startRoom.id, endRoom.id);
       return [
         {
           'floor': sf,

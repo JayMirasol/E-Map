@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -64,6 +65,13 @@ class _FloorMapScreenState extends State<FloorMapScreen>
   @override
   void initState() {
     super.initState();
+
+    // CRITICAL DEBUG: Log immediately
+    print('>>> FloorMapScreen.initState() called');
+    print('>>> Floor: ${widget.floorNumber}');
+    print('>>> initialStartRoomId: ${widget.initialStartRoomId}');
+    print('>>> initialDestinationRoomId: ${widget.initialDestinationRoomId}');
+
     // Force landscape orientation when this screen is opened
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeRight,
@@ -73,6 +81,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     // Initialize with passed room IDs if available
     _startRoomId = widget.initialStartRoomId;
     _destinationRoomId = widget.initialDestinationRoomId;
+
+    print('>>> _startRoomId set to: $_startRoomId');
+    print('>>> _destinationRoomId set to: $_destinationRoomId');
 
     // Initialize animation controllers
     _pathAnimationController = AnimationController(
@@ -120,15 +131,101 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     });
 
     // If both start and destination are provided, start animations
+    print(
+      '>>> Checking if both rooms are set: $_startRoomId != null && $_destinationRoomId != null = ${_startRoomId != null && _destinationRoomId != null}',
+    );
     if (_startRoomId != null && _destinationRoomId != null) {
+      print('>>> YES! Both rooms are set. Setting up PostFrameCallback...');
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        print('>>> PostFrameCallback EXECUTING NOW');
         // Check if there's an active draft session
         final provider = context.read<CampusProvider>();
+        if (kDebugMode) {
+          print(
+            '=== FloorMapScreen Init: $_startRoomId -> $_destinationRoomId ===',
+          );
+          print('Has draft: ${provider.hasDraft}');
+        }
+
         if (provider.hasDraft) {
-          // Continue edit mode from another floor
-          setState(() => _editMode = true);
+          // Check if all required floors already have routes
+          final segments = await provider.computeCrossFloorRoute(
+            _startRoomId!,
+            _destinationRoomId!,
+          );
+
+          bool allFloorsComplete = true;
+          for (final seg in segments) {
+            final floor = seg['floor'] as int;
+
+            // Check campus site plan route
+            if (floor == -1) {
+              final startLocationId = seg['startLocationId'];
+              final endLocationId = seg['endLocationId'];
+              if (startLocationId != null && endLocationId != null) {
+                final campusKey = '$startLocationId->$endLocationId';
+                var hasCampusRoute = provider.manualRoutes.containsKey(
+                  campusKey,
+                );
+
+                // Also check legacy format (with space instead of underscore)
+                if (!hasCampusRoute) {
+                  final legacyKey = campusKey
+                      .replaceAll('_BUILDING', ' BUILDING')
+                      .replaceAll('_', ' ');
+                  hasCampusRoute = provider.manualRoutes.containsKey(legacyKey);
+                  if (kDebugMode && hasCampusRoute) {
+                    print('Campus route found with legacy key: $legacyKey');
+                  }
+                }
+
+                if (kDebugMode) {
+                  print('Campus: key=$campusKey, hasRoute=$hasCampusRoute');
+                }
+                if (!hasCampusRoute) {
+                  allFloorsComplete = false;
+                  break;
+                }
+              }
+              continue;
+            }
+
+            // Check regular floor route
+            final key = '$floor:$_startRoomId->$_destinationRoomId';
+            final hasRoute = provider.manualRoutes.containsKey(key);
+            if (kDebugMode) {
+              print('Floor $floor: key=$key, hasRoute=$hasRoute');
+            }
+            if (!hasRoute) {
+              allFloorsComplete = false;
+              break;
+            }
+          }
+
+          if (kDebugMode) {
+            print('All floors complete: $allFloorsComplete');
+          }
+
+          if (allFloorsComplete) {
+            // All routes complete, perform automatic navigation
+            if (kDebugMode) {
+              print('Starting automatic navigation!');
+            }
+            await _recomputeRoute();
+            _markerAnimationController.repeat(reverse: true);
+            _pathAnimationController.forward();
+          } else {
+            // Continue edit mode from another floor
+            if (kDebugMode) {
+              print('Entering edit mode - some routes missing');
+            }
+            setState(() => _editMode = true);
+          }
         } else {
           // Normal navigation mode
+          if (kDebugMode) {
+            print('No draft - normal navigation mode');
+          }
           await _recomputeRoute();
           _markerAnimationController.repeat(reverse: true);
           _pathAnimationController.forward();
@@ -204,6 +301,10 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       if (seg['connector'] is String) {
         _connectorByFloor[floor] = seg['connector'] as String;
       }
+      // Store campus map info if this is a campus segment
+      if (seg['isCampusMap'] == true) {
+        _routeByFloor[floor] = pts; // Store the campus route
+      }
     }
     _autoSwitchDone = false;
     _showSwitchOverlay = false;
@@ -240,6 +341,20 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     final provider = context.read<CampusProvider>();
     final destRoom = provider.roomById(_destinationRoomId!);
     final destRoomName = destRoom?.name ?? 'destination';
+
+    // Check if the next floor is a campus map (-1 indicates campus site plan)
+    if (nextFloor == -1) {
+      _pendingNextFloor = nextFloor;
+      _pendingDestRoomName = destRoomName;
+
+      // Wait 5 seconds before showing campus transition dialog
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) {
+          _showCampusTransitionDialog(destRoomName);
+        }
+      });
+      return;
+    }
 
     // Store pending floor info
     _pendingNextFloor = nextFloor;
@@ -411,6 +526,95 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     );
   }
 
+  void _showCampusTransitionDialog(String destRoomName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.map, color: Colors.green, size: 28),
+            SizedBox(width: 12),
+            Expanded(child: Text('Moving to Another Building')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your destination is in a different building!',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Click Continue to view the campus site plan showing the path to the destination building where $destRoomName is located.',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.visibility),
+            label: const Text('See Direction First'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.blue,
+              side: const BorderSide(color: Colors.blue),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              setState(() {
+                _showMinimizedButton = true;
+                _showContinuePrompt = false;
+                _countdownSeconds = 10;
+              });
+
+              // Start countdown timer (updates every second)
+              _countdownTimer?.cancel();
+              _countdownTimer = Timer.periodic(const Duration(seconds: 1), (
+                timer,
+              ) {
+                if (!mounted) {
+                  timer.cancel();
+                  return;
+                }
+                setState(() {
+                  _countdownSeconds--;
+                });
+
+                if (_countdownSeconds <= 0) {
+                  timer.cancel();
+                }
+              });
+
+              // Start 10-second timer to show prompt
+              _continuePromptTimer?.cancel();
+              _continuePromptTimer = Timer(const Duration(seconds: 10), () {
+                if (mounted) {
+                  setState(() {
+                    _showContinuePrompt = true;
+                  });
+                }
+              });
+            },
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Continue to Campus Map'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              _proceedToCampusMap();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   void _proceedToNextFloor(int nextFloor) {
     // Clean up timers
     _continuePromptTimer?.cancel();
@@ -421,6 +625,10 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     String imagePath;
 
     switch (nextFloor) {
+      case -1:
+        floorTitle = 'CCA Campus Site Plan';
+        imagePath = 'assets/images/SITE-PLAN-CCA-Model-1.png';
+        break;
       case 1:
         floorTitle = 'Ground Floor';
         imagePath = 'assets/images/1ST FLOOR.jpg';
@@ -504,6 +712,61 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     _countdownTimer?.cancel();
   }
 
+  void _proceedToCampusMap() {
+    // Clean up timers
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
+
+    // Navigate to floor-based campus site plan (floor -1)
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 600),
+            reverseTransitionDuration: const Duration(milliseconds: 400),
+            pageBuilder: (_, __, ___) => FloorMapScreen(
+              floorNumber: -1,
+              floorTitle: 'CCA Campus Site Plan',
+              imagePath: 'assets/images/SITE-PLAN-CCA-Model-1.png',
+              initialStartRoomId: _startRoomId,
+              initialDestinationRoomId: _destinationRoomId,
+            ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  final tween = Tween(
+                    begin: const Offset(0.0, 0.1),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.easeInOut));
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: animation.drive(tween),
+                      child: child,
+                    ),
+                  );
+                },
+          ),
+        )
+        .then((_) {
+          // After returning from campus map, check if we need to continue to next floor
+          final floors = List<int>.from(_routeFloorOrder);
+          final campusIndex = floors.indexOf(-1);
+          if (campusIndex != -1 && campusIndex < floors.length - 1) {
+            // There's a floor after the campus map - proceed to it
+            final nextFloor = floors[campusIndex + 1];
+            _proceedToNextFloor(nextFloor);
+          }
+        });
+
+    _autoSwitchDone = true;
+    setState(() {
+      _showMinimizedButton = false;
+      _showContinuePrompt = false;
+      _countdownSeconds = 10;
+    });
+    _continuePromptTimer?.cancel();
+    _countdownTimer?.cancel();
+  }
+
   bool _areAllRequiredFloorsComplete(CampusProvider provider) {
     if (_startRoomId == null || _destinationRoomId == null) return false;
 
@@ -512,22 +775,80 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       (r) => r.id == _destinationRoomId,
     );
 
-    final minFloor = startRoom.floor! < destRoom.floor!
-        ? startRoom.floor!
-        : destRoom.floor!;
-    final maxFloor = startRoom.floor! > destRoom.floor!
-        ? startRoom.floor!
-        : destRoom.floor!;
+    final startFloor = startRoom.floor!;
+    final destFloor = destRoom.floor!;
+    final startBuilding = startRoom.building;
+    final destBuilding = destRoom.building;
 
-    // Check if all floors between start and destination have paths
-    for (int f = minFloor; f <= maxFloor; f++) {
-      final points = provider.draftPointsForFloor(f);
-      if (points.isEmpty) {
-        return false; // Missing path for this floor
+    // Check if cross-building navigation
+    if (startBuilding != null &&
+        destBuilding != null &&
+        startBuilding != destBuilding) {
+      // Cross-building: need start floors + dest floors (campus map route checked separately)
+      final startGroundFloor = startBuilding == 'MAIN'
+          ? 1
+          : startBuilding == 'NGO'
+          ? 5
+          : 7;
+      final destGroundFloor = destBuilding == 'MAIN'
+          ? 1
+          : destBuilding == 'NGO'
+          ? 5
+          : 7;
+
+      // Check floors from start to start ground
+      if (startFloor != startGroundFloor) {
+        final goingDown = startFloor > startGroundFloor;
+        if (goingDown) {
+          for (int f = startFloor; f >= startGroundFloor; f--) {
+            final points = provider.draftPointsForFloor(f);
+            if (points.isEmpty) return false;
+          }
+        } else {
+          for (int f = startFloor; f <= startGroundFloor; f++) {
+            final points = provider.draftPointsForFloor(f);
+            if (points.isEmpty) return false;
+          }
+        }
+      } else {
+        final points = provider.draftPointsForFloor(startFloor);
+        if (points.isEmpty) return false;
       }
-    }
 
-    return true;
+      // Check floors from dest ground to dest floor
+      if (destFloor != destGroundFloor) {
+        final goingUp = destFloor > destGroundFloor;
+        if (goingUp) {
+          for (int f = destGroundFloor; f <= destFloor; f++) {
+            final points = provider.draftPointsForFloor(f);
+            if (points.isEmpty) return false;
+          }
+        } else {
+          for (int f = destGroundFloor; f >= destFloor; f--) {
+            final points = provider.draftPointsForFloor(f);
+            if (points.isEmpty) return false;
+          }
+        }
+      } else {
+        final points = provider.draftPointsForFloor(destFloor);
+        if (points.isEmpty) return false;
+      }
+
+      return true;
+    } else {
+      // Same building: check all floors between start and destination
+      final minFloor = startFloor < destFloor ? startFloor : destFloor;
+      final maxFloor = startFloor > destFloor ? startFloor : destFloor;
+
+      for (int f = minFloor; f <= maxFloor; f++) {
+        final points = provider.draftPointsForFloor(f);
+        if (points.isEmpty) {
+          return false;
+        }
+      }
+
+      return true;
+    }
   }
 
   @override
@@ -536,9 +857,13 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       future: context.read<CampusProvider>().load(),
       builder: (context, snap) {
         final provider = context.watch<CampusProvider>();
-        final rooms = provider.rooms
-            .where((r) => r.floor == widget.floorNumber)
-            .toList();
+
+        // For campus site plan (floor -1), we'll use campus locations as "rooms"
+        final rooms = widget.floorNumber == -1
+            ? [] // Campus locations will be handled separately
+            : provider.rooms
+                  .where((r) => r.floor == widget.floorNumber)
+                  .toList();
 
         // Focus on selected room if any
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1385,244 +1710,284 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                             .firstWhere(
                                               (r) => r.id == _destinationRoomId,
                                             );
-                                        final minFloor =
-                                            startRoom.floor! < destRoom.floor!
-                                            ? startRoom.floor!
-                                            : destRoom.floor!;
-                                        final maxFloor =
-                                            startRoom.floor! > destRoom.floor!
-                                            ? startRoom.floor!
-                                            : destRoom.floor!;
-                                        final requiredFloors = List.generate(
-                                          maxFloor - minFloor + 1,
-                                          (i) => minFloor + i,
-                                        );
+
+                                        final startFloor = startRoom.floor!;
+                                        final destFloor = destRoom.floor!;
+                                        final startBuilding =
+                                            startRoom.building;
+                                        final destBuilding = destRoom.building;
+
+                                        List<int> requiredFloors = [];
+                                        List<String> floorLabels = [];
+
+                                        // Check if cross-building navigation
+                                        if (startBuilding != null &&
+                                            destBuilding != null &&
+                                            startBuilding != destBuilding) {
+                                          // Cross-building: start floor -> start ground -> dest ground -> dest floor
+                                          final startGroundFloor =
+                                              startBuilding == 'MAIN'
+                                              ? 1
+                                              : startBuilding == 'NGO'
+                                              ? 5
+                                              : 7;
+                                          final destGroundFloor =
+                                              destBuilding == 'MAIN'
+                                              ? 1
+                                              : destBuilding == 'NGO'
+                                              ? 5
+                                              : 7;
+
+                                          // Add floors from start to start ground
+                                          if (startFloor != startGroundFloor) {
+                                            final goingDown =
+                                                startFloor > startGroundFloor;
+                                            if (goingDown) {
+                                              for (
+                                                int f = startFloor;
+                                                f >= startGroundFloor;
+                                                f--
+                                              ) {
+                                                requiredFloors.add(f);
+                                              }
+                                            } else {
+                                              for (
+                                                int f = startFloor;
+                                                f <= startGroundFloor;
+                                                f++
+                                              ) {
+                                                requiredFloors.add(f);
+                                              }
+                                            }
+                                          } else {
+                                            requiredFloors.add(startFloor);
+                                          }
+
+                                          // Add destination ground floor if different from start ground
+                                          if (destGroundFloor !=
+                                                  startGroundFloor &&
+                                              !requiredFloors.contains(
+                                                destGroundFloor,
+                                              )) {
+                                            requiredFloors.add(destGroundFloor);
+                                          }
+
+                                          // Add floors from dest ground to dest floor
+                                          if (destFloor != destGroundFloor) {
+                                            final goingUp =
+                                                destFloor > destGroundFloor;
+                                            if (goingUp) {
+                                              for (
+                                                int f = destGroundFloor + 1;
+                                                f <= destFloor;
+                                                f++
+                                              ) {
+                                                if (!requiredFloors.contains(
+                                                  f,
+                                                )) {
+                                                  requiredFloors.add(f);
+                                                }
+                                              }
+                                            } else {
+                                              for (
+                                                int f = destGroundFloor - 1;
+                                                f >= destFloor;
+                                                f--
+                                              ) {
+                                                if (!requiredFloors.contains(
+                                                  f,
+                                                )) {
+                                                  requiredFloors.add(f);
+                                                }
+                                              }
+                                            }
+                                          }
+
+                                          // Create floor labels
+                                          for (final f in requiredFloors) {
+                                            if (f <= 4) {
+                                              floorLabels.add(
+                                                f == 1 ? 'Main GF' : 'Main $f',
+                                              );
+                                            } else if (f <= 6) {
+                                              floorLabels.add(
+                                                f == 5 ? 'NGO GF' : 'NGO 2F',
+                                              );
+                                            } else {
+                                              final pagcorFloor = f - 6;
+                                              floorLabels.add(
+                                                'PAGCOR ${pagcorFloor}F',
+                                              );
+                                            }
+                                          }
+
+                                          // Insert "Campus Site Plan" between start building ground and dest building ground
+                                          if (floorLabels.isNotEmpty) {
+                                            // Find where to insert campus site plan
+                                            final startGFLabel =
+                                                startBuilding == 'MAIN'
+                                                ? 'Main GF'
+                                                : startBuilding == 'NGO'
+                                                ? 'NGO GF'
+                                                : 'PAGCOR 1F';
+                                            final insertIndex = floorLabels
+                                                .indexOf(startGFLabel);
+                                            if (insertIndex != -1 &&
+                                                insertIndex <
+                                                    floorLabels.length - 1) {
+                                              floorLabels.insert(
+                                                insertIndex + 1,
+                                                'Campus Site Plan',
+                                              );
+                                            }
+                                          }
+                                        } else {
+                                          // Same building: simple floor range
+                                          final minFloor =
+                                              startFloor < destFloor
+                                              ? startFloor
+                                              : destFloor;
+                                          final maxFloor =
+                                              startFloor > destFloor
+                                              ? startFloor
+                                              : destFloor;
+                                          requiredFloors = List.generate(
+                                            maxFloor - minFloor + 1,
+                                            (i) => minFloor + i,
+                                          );
+                                          floorLabels = requiredFloors
+                                              .map((f) => f.toString())
+                                              .toList();
+                                        }
 
                                         showModalBottomSheet(
                                           context: context,
+                                          isScrollControlled: true,
+                                          constraints: BoxConstraints(
+                                            maxHeight:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).size.height *
+                                                0.75,
+                                          ),
                                           builder: (_) => SafeArea(
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const SizedBox(height: 12),
-                                                const Text(
-                                                  'Switch to another floor to continue drawing',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
+                                            child: SingleChildScrollView(
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  16,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  'Required floors: ${requiredFloors.join(", ")}',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.green,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                const Text(
-                                                  'Your progress will be saved automatically',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 16),
-                                                Wrap(
-                                                  spacing: 8,
-                                                  runSpacing: 8,
-                                                  children: List.generate(10, (
-                                                    index,
-                                                  ) {
-                                                    final f = index + 1;
-                                                    final points = provider
-                                                        .draftPointsForFloor(f);
-                                                    final isRequired =
-                                                        requiredFloors.contains(
-                                                          f,
-                                                        );
-                                                    final isCurrent =
-                                                        f == widget.floorNumber;
-                                                    final hasPath =
-                                                        points.isNotEmpty;
-
-                                                    // Get floor title
-                                                    String floorTitle;
-                                                    String imagePath;
-
-                                                    switch (f) {
-                                                      case 1:
-                                                        floorTitle =
-                                                            'Ground Floor';
-                                                        imagePath =
-                                                            'assets/images/1ST FLOOR.jpg';
-                                                        break;
-                                                      case 2:
-                                                        floorTitle =
-                                                            '2nd Floor: Main Building';
-                                                        imagePath =
-                                                            'assets/images/2ND FLOOR.jpg';
-                                                        break;
-                                                      case 3:
-                                                        floorTitle =
-                                                            '3rd Floor';
-                                                        imagePath =
-                                                            'assets/images/3RD FLOOR.jpg';
-                                                        break;
-                                                      case 4:
-                                                        floorTitle =
-                                                            '4th Floor';
-                                                        imagePath =
-                                                            'assets/images/4TH FLOOR.jpg';
-                                                        break;
-                                                      case 5:
-                                                        floorTitle =
-                                                            'NGO Building - Ground Floor';
-                                                        imagePath =
-                                                            'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
-                                                        break;
-                                                      case 6:
-                                                        floorTitle =
-                                                            'NGO Building - 2nd Floor';
-                                                        imagePath =
-                                                            'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
-                                                        break;
-                                                      case 7:
-                                                        floorTitle =
-                                                            'PAGCOR Building - 1st Floor';
-                                                        imagePath =
-                                                            'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
-                                                        break;
-                                                      case 8:
-                                                        floorTitle =
-                                                            'PAGCOR Building - 2nd Floor';
-                                                        imagePath =
-                                                            'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
-                                                        break;
-                                                      case 9:
-                                                        floorTitle =
-                                                            'PAGCOR Building - 3rd Floor';
-                                                        imagePath =
-                                                            'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
-                                                        break;
-                                                      case 10:
-                                                        floorTitle =
-                                                            'PAGCOR Building - 4th Floor';
-                                                        imagePath =
-                                                            'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
-                                                        break;
-                                                      default:
-                                                        floorTitle = 'Floor $f';
-                                                        imagePath = '';
-                                                    }
-
-                                                    // Get building/floor label for button
-                                                    String buttonLabel;
-                                                    if (f <= 4) {
-                                                      buttonLabel = 'Floor $f';
-                                                    } else if (f <= 6) {
-                                                      buttonLabel = f == 5
-                                                          ? 'NGO GF'
-                                                          : 'NGO 2F';
-                                                    } else {
-                                                      final pagcorFloor = f - 6;
-                                                      buttonLabel =
-                                                          'PAG $pagcorFloor';
-                                                    }
-
-                                                    return OutlinedButton(
-                                                      onPressed: isCurrent
-                                                          ? null
-                                                          : () {
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Text(
+                                                      'Switch to another floor to continue drawing',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      'Required floors: ${floorLabels.join(" → ")}',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.green,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    const Text(
+                                                      'Your progress will be saved automatically',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 16),
+                                                    Wrap(
+                                                      spacing: 8,
+                                                      runSpacing: 8,
+                                                      children: [
+                                                        // Add Campus Site Plan button (floor-based) for cross-building routes
+                                                        if (startBuilding !=
+                                                                null &&
+                                                            destBuilding !=
+                                                                null &&
+                                                            startBuilding !=
+                                                                destBuilding)
+                                                          OutlinedButton(
+                                                            onPressed: () {
                                                               Navigator.pop(
                                                                 context,
                                                               );
+                                                              // Navigate to floor -1 (Campus Site Plan)
                                                               Navigator.of(
-                                                                context,
-                                                              ).push(
-                                                                MaterialPageRoute(
-                                                                  builder: (_) => FloorMapScreen(
-                                                                    floorNumber:
-                                                                        f,
-                                                                    floorTitle:
-                                                                        floorTitle,
-                                                                    imagePath:
-                                                                        imagePath,
-                                                                    initialStartRoomId:
-                                                                        _startRoomId,
-                                                                    initialDestinationRoomId:
-                                                                        _destinationRoomId,
-                                                                  ),
-                                                                ),
-                                                              );
+                                                                    context,
+                                                                  )
+                                                                  .push(
+                                                                    MaterialPageRoute(
+                                                                      builder: (_) => FloorMapScreen(
+                                                                        floorNumber:
+                                                                            -1,
+                                                                        floorTitle:
+                                                                            'CCA Campus Site Plan',
+                                                                        imagePath:
+                                                                            'assets/images/SITE-PLAN-CCA-Model-1.png',
+                                                                        initialStartRoomId:
+                                                                            _startRoomId,
+                                                                        initialDestinationRoomId:
+                                                                            _destinationRoomId,
+                                                                      ),
+                                                                    ),
+                                                                  )
+                                                                  .then((_) {
+                                                                    // When returning from campus map, user can continue to next floor
+                                                                    setState(
+                                                                      () {},
+                                                                    );
+                                                                  });
                                                             },
-                                                      style:
-                                                          OutlinedButton.styleFrom(
-                                                            backgroundColor:
-                                                                isCurrent
-                                                                ? Colors
-                                                                      .grey[300]
-                                                                : hasPath
-                                                                ? Colors
-                                                                      .green[100]
-                                                                : isRequired
-                                                                ? Colors
-                                                                      .orange[50]
-                                                                : Colors
-                                                                      .grey[50],
-                                                            side: BorderSide(
-                                                              color: isRequired
-                                                                  ? Colors
-                                                                        .orange
-                                                                  : Colors.grey,
-                                                              width: isRequired
-                                                                  ? 2
-                                                                  : 1,
+                                                            style: OutlinedButton.styleFrom(
+                                                              backgroundColor:
+                                                                  Colors
+                                                                      .green[50],
+                                                              side:
+                                                                  const BorderSide(
+                                                                    color: Colors
+                                                                        .green,
+                                                                    width: 2,
+                                                                  ),
                                                             ),
-                                                          ),
-                                                      child: Column(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              if (isRequired)
-                                                                const Icon(
-                                                                  Icons.star,
-                                                                  size: 12,
-                                                                  color: Colors
-                                                                      .orange,
-                                                                ),
-                                                              const SizedBox(
-                                                                width: 4,
-                                                              ),
-                                                              Text(buttonLabel),
-                                                            ],
-                                                          ),
-                                                          if (hasPath)
-                                                            Row(
+                                                            child: Column(
                                                               mainAxisSize:
                                                                   MainAxisSize
                                                                       .min,
                                                               children: [
-                                                                const Icon(
-                                                                  Icons
-                                                                      .check_circle,
-                                                                  size: 10,
-                                                                  color: Colors
-                                                                      .green,
+                                                                Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    const Icon(
+                                                                      Icons.map,
+                                                                      size: 12,
+                                                                      color: Colors
+                                                                          .green,
+                                                                    ),
+                                                                    const SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    const Text(
+                                                                      'Campus Site Plan',
+                                                                    ),
+                                                                  ],
                                                                 ),
-                                                                const SizedBox(
-                                                                  width: 4,
-                                                                ),
-                                                                Text(
-                                                                  '${points.length} pts',
-                                                                  style: const TextStyle(
+                                                                const Text(
+                                                                  'Required',
+                                                                  style: TextStyle(
                                                                     fontSize:
                                                                         10,
                                                                     color: Colors
@@ -1630,23 +1995,242 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                                                   ),
                                                                 ),
                                                               ],
-                                                            )
-                                                          else if (isRequired)
-                                                            const Text(
-                                                              'Required',
-                                                              style: TextStyle(
-                                                                fontSize: 10,
-                                                                color: Colors
-                                                                    .orange,
+                                                            ),
+                                                          ),
+                                                        // Floor buttons
+                                                        ...List.generate(10, (
+                                                          index,
+                                                        ) {
+                                                          final f = index + 1;
+                                                          final points = provider
+                                                              .draftPointsForFloor(
+                                                                f,
+                                                              );
+                                                          final isRequired =
+                                                              requiredFloors
+                                                                  .contains(f);
+                                                          final isCurrent =
+                                                              f ==
+                                                              widget
+                                                                  .floorNumber;
+                                                          final hasPath =
+                                                              points.isNotEmpty;
+
+                                                          // Get floor title
+                                                          String floorTitle;
+                                                          String imagePath;
+
+                                                          switch (f) {
+                                                            case 1:
+                                                              floorTitle =
+                                                                  'Ground Floor';
+                                                              imagePath =
+                                                                  'assets/images/1ST FLOOR.jpg';
+                                                              break;
+                                                            case 2:
+                                                              floorTitle =
+                                                                  '2nd Floor: Main Building';
+                                                              imagePath =
+                                                                  'assets/images/2ND FLOOR.jpg';
+                                                              break;
+                                                            case 3:
+                                                              floorTitle =
+                                                                  '3rd Floor';
+                                                              imagePath =
+                                                                  'assets/images/3RD FLOOR.jpg';
+                                                              break;
+                                                            case 4:
+                                                              floorTitle =
+                                                                  '4th Floor';
+                                                              imagePath =
+                                                                  'assets/images/4TH FLOOR.jpg';
+                                                              break;
+                                                            case 5:
+                                                              floorTitle =
+                                                                  'NGO Building - Ground Floor';
+                                                              imagePath =
+                                                                  'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+                                                              break;
+                                                            case 6:
+                                                              floorTitle =
+                                                                  'NGO Building - 2nd Floor';
+                                                              imagePath =
+                                                                  'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+                                                              break;
+                                                            case 7:
+                                                              floorTitle =
+                                                                  'PAGCOR Building - 1st Floor';
+                                                              imagePath =
+                                                                  'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+                                                              break;
+                                                            case 8:
+                                                              floorTitle =
+                                                                  'PAGCOR Building - 2nd Floor';
+                                                              imagePath =
+                                                                  'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+                                                              break;
+                                                            case 9:
+                                                              floorTitle =
+                                                                  'PAGCOR Building - 3rd Floor';
+                                                              imagePath =
+                                                                  'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+                                                              break;
+                                                            case 10:
+                                                              floorTitle =
+                                                                  'PAGCOR Building - 4th Floor';
+                                                              imagePath =
+                                                                  'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+                                                              break;
+                                                            default:
+                                                              floorTitle =
+                                                                  'Floor $f';
+                                                              imagePath = '';
+                                                          }
+
+                                                          // Get building/floor label for button
+                                                          String buttonLabel;
+                                                          if (f <= 4) {
+                                                            buttonLabel =
+                                                                'Floor $f';
+                                                          } else if (f <= 6) {
+                                                            buttonLabel = f == 5
+                                                                ? 'NGO GF'
+                                                                : 'NGO 2F';
+                                                          } else {
+                                                            final pagcorFloor =
+                                                                f - 6;
+                                                            buttonLabel =
+                                                                'PAG $pagcorFloor';
+                                                          }
+
+                                                          return OutlinedButton(
+                                                            onPressed: isCurrent
+                                                                ? null
+                                                                : () {
+                                                                    Navigator.pop(
+                                                                      context,
+                                                                    );
+                                                                    Navigator.of(
+                                                                      context,
+                                                                    ).push(
+                                                                      MaterialPageRoute(
+                                                                        builder: (_) => FloorMapScreen(
+                                                                          floorNumber:
+                                                                              f,
+                                                                          floorTitle:
+                                                                              floorTitle,
+                                                                          imagePath:
+                                                                              imagePath,
+                                                                          initialStartRoomId:
+                                                                              _startRoomId,
+                                                                          initialDestinationRoomId:
+                                                                              _destinationRoomId,
+                                                                        ),
+                                                                      ),
+                                                                    );
+                                                                  },
+                                                            style: OutlinedButton.styleFrom(
+                                                              backgroundColor:
+                                                                  isCurrent
+                                                                  ? Colors
+                                                                        .grey[300]
+                                                                  : hasPath
+                                                                  ? Colors
+                                                                        .green[100]
+                                                                  : isRequired
+                                                                  ? Colors
+                                                                        .orange[50]
+                                                                  : Colors
+                                                                        .grey[50],
+                                                              side: BorderSide(
+                                                                color:
+                                                                    isRequired
+                                                                    ? Colors
+                                                                          .orange
+                                                                    : Colors
+                                                                          .grey,
+                                                                width:
+                                                                    isRequired
+                                                                    ? 2
+                                                                    : 1,
                                                               ),
                                                             ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  }),
+                                                            child: Column(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    if (isRequired)
+                                                                      const Icon(
+                                                                        Icons
+                                                                            .star,
+                                                                        size:
+                                                                            12,
+                                                                        color: Colors
+                                                                            .orange,
+                                                                      ),
+                                                                    const SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    Text(
+                                                                      buttonLabel,
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                if (hasPath)
+                                                                  Row(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      const Icon(
+                                                                        Icons
+                                                                            .check_circle,
+                                                                        size:
+                                                                            10,
+                                                                        color: Colors
+                                                                            .green,
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            4,
+                                                                      ),
+                                                                      Text(
+                                                                        '${points.length} pts',
+                                                                        style: const TextStyle(
+                                                                          fontSize:
+                                                                              10,
+                                                                          color:
+                                                                              Colors.green,
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  )
+                                                                else if (isRequired)
+                                                                  const Text(
+                                                                    'Required',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          10,
+                                                                      color: Colors
+                                                                          .orange,
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ),
+                                                          );
+                                                        }),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                  ],
                                                 ),
-                                                const SizedBox(height: 12),
-                                              ],
+                                              ),
                                             ),
                                           ),
                                         );

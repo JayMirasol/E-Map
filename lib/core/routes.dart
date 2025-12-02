@@ -20,6 +20,7 @@ class AppRoutes {
   static const map = '/map';
   static const map2d = '/map2d';
   static const mapSelection = '/map-selection';
+  static const campusPlan = '/floor-1';
   static const floor1 = '/floor1';
   static const floor2 = '/floor2';
   static const floor3 = '/floor3';
@@ -45,6 +46,11 @@ class AppRoutes {
     map: (_) => const MapScreen(),
     map2d: (_) => const Map2DScreen(),
     mapSelection: (_) => const MapSelectionScreen(),
+    campusPlan: (_) => const FloorMapScreen(
+      floorNumber: -1,
+      floorTitle: 'CCA Campus Site Plan',
+      imagePath: 'assets/images/SITE-PLAN-CCA-Model-1.png',
+    ),
     floor1: (_) => const FloorMapScreen(
       floorNumber: 1,
       floorTitle: 'Ground Floor',

@@ -937,7 +937,7 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
     );
   }
 
-  void _navigateToRoomWithPath(BuildContext context) {
+  void _navigateToRoomWithPath(BuildContext context) async {
     if (_selectedStartRoomId == null || _selectedDestinationRoomId == null) {
       return;
     }
@@ -952,9 +952,11 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
       return;
     }
 
+    // Pop this screen first to go back to SchedulesScreen
+    Navigator.of(context).pop();
+
     // Navigate to the floor map with both rooms selected (supports cross-floor)
     // The FloorMapScreen will handle cross-floor routing using manual routes
-    Navigator.of(context).pop(); // Close instructor detail screen
     _navigateToFloorMapWithPath(
       context,
       startRoom.floor!,
@@ -969,6 +971,11 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
     String startRoomId,
     String destRoomId,
   ) {
+    print('>>> SchedulesScreen._navigateToFloorMapWithPath called');
+    print('>>> floor: $floor');
+    print('>>> startRoomId: $startRoomId');
+    print('>>> destRoomId: $destRoomId');
+
     String floorTitle;
     String imagePath;
 
@@ -1018,6 +1025,12 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
         Navigator.pushNamed(context, AppRoutes.mapSelection);
         return;
     }
+
+    print('>>> About to Navigator.push to FloorMapScreen');
+    print('>>> floorNumber: $floor, floorTitle: $floorTitle');
+    print(
+      '>>> initialStartRoomId: $startRoomId, initialDestinationRoomId: $destRoomId',
+    );
 
     Navigator.push(
       context,
