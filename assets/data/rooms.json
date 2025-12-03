@@ -137,6 +137,11 @@
   {"id":"P402","name":"P402","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.384,"fy":0.407},
   {"id":"P403","name":"P403","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.507,"fy":0.407},
   {"id":"P404","name":"P404","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.621,"fy":0.407},
-  {"id":"P405","name":"P405","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.740,"fy":0.407}
+  {"id":"P405","name":"P405","type":"classroom","floor":10,"lat":15.14715,"lng":120.58745,"fx":0.740,"fy":0.407},
+
+  {"id":"MAIN_GATE","name":"Main Gate","type":"campus","floor":-1,"lat":15.14715,"lng":120.58745,"fx":0.369,"fy":0.833},
+  {"id":"MAIN_BUILDING","name":"Main Building","type":"campus","floor":-1,"lat":15.14715,"lng":120.58745,"fx":0.492,"fy":0.581},
+  {"id":"NGO_BUILDING","name":"NGO Building","type":"campus","floor":-1,"lat":15.14715,"lng":120.58745,"fx":0.370,"fy":0.230},
+  {"id":"PAGCOR_BUILDING","name":"PAGCOR Building","type":"campus","floor":-1,"lat":15.14715,"lng":120.58745,"fx":0.456,"fy":0.119}
 
 ]

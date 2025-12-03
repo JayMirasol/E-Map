@@ -278,6 +278,18 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       _startRoomId!,
       _destinationRoomId!,
     );
+
+    if (kDebugMode) {
+      print('=== Route Computation ===');
+      print('Total segments: ${segments.length}');
+      for (var i = 0; i < segments.length; i++) {
+        final seg = segments[i];
+        print(
+          'Segment $i: floor=${seg['floor']}, isCampusMap=${seg['isCampusMap']}, points=${(seg['points'] as List).length}',
+        );
+      }
+    }
+
     _routeByFloor.clear();
     _routeInstructions.clear();
     _connectorByFloor.clear();
@@ -295,6 +307,12 @@ class _FloorMapScreenState extends State<FloorMapScreen>
           )
           .toList();
       _routeByFloor[floor] = pts;
+
+      if (kDebugMode && floor == -1) {
+        print('Storing campus route for floor -1: ${pts.length} points');
+        print('First point: ${pts.isNotEmpty ? pts.first : "none"}');
+      }
+
       if (seg['instruction'] is String) {
         _routeInstructions.add(seg['instruction'] as String);
       }
@@ -859,11 +877,9 @@ class _FloorMapScreenState extends State<FloorMapScreen>
         final provider = context.watch<CampusProvider>();
 
         // For campus site plan (floor -1), we'll use campus locations as "rooms"
-        final rooms = widget.floorNumber == -1
-            ? [] // Campus locations will be handled separately
-            : provider.rooms
-                  .where((r) => r.floor == widget.floorNumber)
-                  .toList();
+        final rooms = provider.rooms
+            .where((r) => r.floor == widget.floorNumber)
+            .toList();
 
         // Focus on selected room if any
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2578,6 +2594,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
         title: 'Select Destination Room',
         currentFloor: widget.floorNumber,
         isStartSelection: false,
+        selectedStartRoomId: _startRoomId,
       ),
     );
     if (selected != null) {
@@ -2593,14 +2610,26 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 
       final isDifferentFloors = startRoom.floor != destRoom.floor;
 
+      // Determine if this is a cross-building route
+      final startBuilding = provider.getBuildingForRoom(startRoom);
+      final endBuilding = provider.getBuildingForRoom(destRoom);
+      final isCrossBuilding =
+          startBuilding != null &&
+          endBuilding != null &&
+          startBuilding != endBuilding;
+
       // Check if a complete manual route already exists
       final hasExistingRoute = provider.hasCompleteManualRoute(
         _startRoomId!,
         selected,
       );
 
-      if (isDifferentFloors && !_editMode && !hasExistingRoute) {
-        // Cross-floor route detected and NO saved route exists - enable manual route mode
+      // For cross-building routes, compute automatically without requiring manual routes
+      if (isDifferentFloors &&
+          !_editMode &&
+          !hasExistingRoute &&
+          !isCrossBuilding) {
+        // Same-building cross-floor route detected and NO saved route exists - enable manual route mode
         setState(() => _editMode = true);
         provider.beginManualRoute(_startRoomId!, selected);
 
@@ -2799,12 +2828,14 @@ class _RoomSelectionDialog extends StatefulWidget {
   final String title;
   final int currentFloor;
   final bool isStartSelection;
+  final String? selectedStartRoomId;
 
   const _RoomSelectionDialog({
     required this.rooms,
     required this.title,
     required this.currentFloor,
     required this.isStartSelection,
+    this.selectedStartRoomId,
   });
 
   @override
@@ -3144,20 +3175,36 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
                                   index < currentIndex + floorRooms.length) {
                                 final roomIndex = index - currentIndex;
                                 final room = floorRooms[roomIndex];
+                                final isStartRoom = room.id == widget.selectedStartRoomId;
 
                                 return ListTile(
+                                  enabled: !isStartRoom,
                                   leading: CircleAvatar(
+                                    backgroundColor: isStartRoom ? Colors.grey[300] : null,
                                     child: Text(
                                       room.name.replaceAll(
                                         RegExp(r'[^0-9]'),
                                         '',
                                       ),
-                                      style: const TextStyle(fontSize: 12),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isStartRoom ? Colors.grey[600] : null,
+                                      ),
                                     ),
                                   ),
-                                  title: Text(room.name),
-                                  subtitle: Text(room.type),
-                                  onTap: () {
+                                  title: Text(
+                                    room.name,
+                                    style: TextStyle(
+                                      color: isStartRoom ? Colors.grey[400] : null,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    isStartRoom ? '${room.type} (Already selected as start)' : room.type,
+                                    style: TextStyle(
+                                      color: isStartRoom ? Colors.grey[400] : null,
+                                    ),
+                                  ),
+                                  onTap: isStartRoom ? null : () {
                                     Navigator.pop(context, room.id);
                                   },
                                 );
