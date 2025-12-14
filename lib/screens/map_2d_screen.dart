@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
 import '../models/room.dart';
+import '../services/voice_navigation_service.dart';
+import '../services/voice_command_service.dart';
 import 'floor_map_screen.dart';
 
 // Model for campus locations
@@ -97,9 +99,17 @@ class _Map2DScreenState extends State<Map2DScreen>
   late Animation<double> _pathAnimation;
   late Animation<double> _walkingAnimation;
 
+  // Voice navigation
+  final VoiceNavigationService _voiceNav = VoiceNavigationService();
+  late final VoiceCommandService _voiceCommand;
+  bool _voiceEnabled = true;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize voice command service
+    _voiceCommand = VoiceCommandService(_voiceNav);
 
     // Force portrait orientation
     SystemChrome.setPreferredOrientations([
@@ -267,6 +277,8 @@ class _Map2DScreenState extends State<Map2DScreen>
 
   @override
   void dispose() {
+    _voiceNav.dispose();
+    _voiceCommand.dispose();
     _pathAnimationController.dispose();
     _markerAnimationController.dispose();
     _walkingAnimationController.dispose();
@@ -279,6 +291,177 @@ class _Map2DScreenState extends State<Map2DScreen>
       DeviceOrientation.landscapeLeft,
     ]);
     super.dispose();
+  }
+
+  /// Handle voice command - listen for start and destination
+  Future<void> _handleVoiceCommand(BuildContext context) async {
+    // Get all available location names
+    final locationNames = _locations.map((loc) => loc.name).toList();
+
+    if (locationNames.isEmpty) {
+      const message = 'Campus map data is still loading. Please wait.';
+      await _voiceNav.speak(message);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.hourglass_empty, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(message)),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    debugPrint(
+      '🎤 Starting voice command (${locationNames.length} locations available)',
+    );
+
+    // Show visual prompt that we're listening
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.mic, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '🎤 Listening... Say your start and destination building',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 15),
+        ),
+      );
+    }
+
+    await _voiceCommand.listenForCommand(
+      onResult: (recognizedText) async {
+        debugPrint('🎤 Voice command completed: "$recognizedText"');
+
+        // Parse the command
+        final command = _voiceCommand.parseCommand(
+          recognizedText,
+          locationNames,
+        );
+        debugPrint('🎤 Parsed command: $command');
+
+        if (command.isValid &&
+            command.startRoom != null &&
+            command.destinationRoom != null) {
+          // Find location IDs
+          final startLoc = _locations.firstWhere(
+            (loc) => loc.name == command.startRoom,
+            orElse: () => _locations.first,
+          );
+          final destLoc = _locations.firstWhere(
+            (loc) => loc.name == command.destinationRoom,
+            orElse: () => _locations.last,
+          );
+
+          // Set start and destination
+          setState(() {
+            _startLocationId = startLoc.id;
+            _destinationLocationId = destLoc.id;
+          });
+
+          // Compute and animate route
+          _computeRoute();
+
+          // Announce success
+          final successMessage =
+              'Navigation set from ${command.startRoom} to ${command.destinationRoom}. Starting navigation.';
+          await _voiceNav.speak(successMessage);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(successMessage)),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } else {
+          // Failed to parse
+          debugPrint('❌ Failed to parse voice command');
+          const errorMessage =
+              'Oops! Your voice is unclear. Please repeat and say your start and destination building clearly.';
+          await _voiceNav.speak(
+            '$errorMessage For example, say: from Main Building to NGO Building.',
+          );
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.hearing_disabled, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            errorMessage,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Example: "from Main Building to NGO Building"',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 6),
+              ),
+            );
+          }
+        }
+      },
+      onError: (error) async {
+        debugPrint('❌ Voice command error: $error');
+        const errorMessage = 'Sorry, I could not understand. Please try again.';
+        await _voiceNav.speak(errorMessage);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(child: Text(errorMessage)),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+    );
   }
 
   Offset? _getPositionAlongPath(double progress) {
@@ -383,16 +566,51 @@ class _Map2DScreenState extends State<Map2DScreen>
   }
 
   void _computeRoute() {
-    if (_startLocationId == null || _destinationLocationId == null) return;
+    debugPrint(
+      '🗺️ _computeRoute called - Start: $_startLocationId, Dest: $_destinationLocationId',
+    );
+
+    if (_startLocationId == null || _destinationLocationId == null) {
+      debugPrint('🗺️ Missing start or destination, returning...');
+      return;
+    }
 
     final routeKey = '$_startLocationId->$_destinationLocationId';
     final route = _routes[routeKey];
+
+    debugPrint('🗺️ Looking for route: $routeKey');
+    debugPrint(
+      '🗺️ Route found: ${route != null}, Points: ${route?.length ?? 0}',
+    );
 
     if (route != null) {
       setState(() {
         _currentRoute = route;
         _destinationReached = false;
       });
+
+      // Start voice navigation
+      debugPrint('🗺️ Voice enabled: $_voiceEnabled');
+      if (_voiceEnabled && _destinationLocationId != null) {
+        final dest = _locations.firstWhere(
+          (loc) => loc.id == _destinationLocationId,
+          orElse: () => CampusLocation(
+            id: '',
+            name: 'destination',
+            type: '',
+            fx: 0,
+            fy: 0,
+          ),
+        );
+
+        debugPrint('🗺️ Calling voice navigation for: ${dest.name}');
+        _voiceNav.announceNavigationStart(dest.name);
+        _voiceNav.startTurnByTurnNavigation(
+          _currentRoute!,
+          dest.name,
+          instructionInterval: const Duration(seconds: 5),
+        );
+      }
 
       // Start path animation
       _pathAnimationController.forward(from: 0.0);
@@ -420,6 +638,11 @@ class _Map2DScreenState extends State<Map2DScreen>
       orElse: () =>
           CampusLocation(id: '', name: 'Destination', type: '', fx: 0, fy: 0),
     );
+
+    // Announce arrival
+    if (_voiceEnabled) {
+      _voiceNav.announceArrival(destLocation.name);
+    }
 
     showDialog(
       context: context,
@@ -780,6 +1003,15 @@ class _Map2DScreenState extends State<Map2DScreen>
           appBar: AppBar(
             title: const Text('2D Campus Map'),
             actions: [
+              // Voice command button
+              IconButton(
+                tooltip: 'Voice Command',
+                icon: Icon(
+                  _voiceCommand.isListening ? Icons.mic : Icons.mic_none,
+                  color: _voiceCommand.isListening ? Colors.red : null,
+                ),
+                onPressed: () => _handleVoiceCommand(context),
+              ),
               IconButton(
                 tooltip: 'Reset',
                 icon: const Icon(Icons.close),
@@ -1047,6 +1279,60 @@ class _Map2DScreenState extends State<Map2DScreen>
                                   ),
                                 );
                               }),
+
+                              // Voice navigation toggle button
+                              Positioned(
+                                top: 16,
+                                right: 16,
+                                child: FloatingActionButton(
+                                  mini: true,
+                                  heroTag: 'voice_campus_btn',
+                                  backgroundColor: _voiceEnabled
+                                      ? const Color(0xFF1976D2)
+                                      : Colors.grey,
+                                  elevation: 4,
+                                  tooltip: _voiceEnabled
+                                      ? 'Mute voice navigation'
+                                      : 'Enable voice navigation',
+                                  onPressed: () {
+                                    setState(() {
+                                      _voiceEnabled = !_voiceEnabled;
+                                      _voiceNav.setEnabled(_voiceEnabled);
+                                    });
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            Icon(
+                                              _voiceEnabled
+                                                  ? Icons.volume_up
+                                                  : Icons.volume_off,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              _voiceEnabled
+                                                  ? 'Voice navigation enabled'
+                                                  : 'Voice navigation muted',
+                                            ),
+                                          ],
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                        backgroundColor: _voiceEnabled
+                                            ? Colors.green
+                                            : Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                  child: Icon(
+                                    _voiceEnabled
+                                        ? Icons.volume_up
+                                        : Icons.volume_off,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

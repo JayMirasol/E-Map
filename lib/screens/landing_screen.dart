@@ -143,6 +143,16 @@ class _LandingScreenState extends State<LandingScreen>
                           ),
                           const SizedBox(height: 14),
                           _EnhancedButton(
+                            icon: Icons.menu_book_rounded,
+                            label: 'User Manual',
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.userManual,
+                            ),
+                            isPrimary: true,
+                          ),
+                          const SizedBox(height: 14),
+                          _EnhancedButton(
                             icon: Icons.info_outline_rounded,
                             label: 'About',
                             onPressed: () =>

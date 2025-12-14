@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/campus_provider.dart';
+import '../services/voice_navigation_service.dart';
+import '../services/voice_command_service.dart';
 import '../widgets/room_details_sheet.dart';
 
 class FloorMapScreen extends StatefulWidget {
@@ -62,9 +64,17 @@ class _FloorMapScreenState extends State<FloorMapScreen>
   late Animation<double> _pathAnimation;
   late Animation<double> _walkingPersonAnimation;
 
+  // Voice navigation
+  final VoiceNavigationService _voiceNav = VoiceNavigationService();
+  late final VoiceCommandService _voiceCommand;
+  bool _voiceEnabled = true;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize voice command service
+    _voiceCommand = VoiceCommandService(_voiceNav);
 
     // CRITICAL DEBUG: Log immediately
     print('>>> FloorMapScreen.initState() called');
@@ -214,6 +224,11 @@ class _FloorMapScreenState extends State<FloorMapScreen>
             await _recomputeRoute();
             _markerAnimationController.repeat(reverse: true);
             _pathAnimationController.forward();
+
+            // Announce navigation start with voice
+            if (mounted) {
+              _announceNavigationStart();
+            }
           } else {
             // Continue edit mode from another floor
             if (kDebugMode) {
@@ -229,6 +244,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
           await _recomputeRoute();
           _markerAnimationController.repeat(reverse: true);
           _pathAnimationController.forward();
+          _announceNavigationStart();
         }
       });
     }
@@ -236,6 +252,8 @@ class _FloorMapScreenState extends State<FloorMapScreen>
 
   @override
   void dispose() {
+    _voiceNav.dispose();
+    _voiceCommand.dispose();
     _transformationController.dispose();
     _pathAnimationController.dispose();
     _markerAnimationController.dispose();
@@ -250,6 +268,226 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       DeviceOrientation.landscapeLeft,
     ]);
     super.dispose();
+  }
+
+  /// Handle voice command - listen for start and destination
+  Future<void> _handleVoiceCommand(BuildContext context) async {
+    final provider = context.read<CampusProvider>();
+
+    // Get ALL available room names across all floors for cross-floor navigation
+    final rooms = provider.rooms.toList();
+    final roomNames = rooms.map((r) => r.name).toList();
+
+    if (roomNames.isEmpty) {
+      const message = 'No rooms available.';
+      await _voiceNav.speak(message);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(message)),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    debugPrint(
+      '🎤 Starting voice command (${roomNames.length} rooms available across all floors)',
+    );
+
+    // Show visual prompt that we're listening
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.mic, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '🎤 Listening... Say your start and destination room',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 15),
+        ),
+      );
+    }
+
+    await _voiceCommand.listenForCommand(
+      onResult: (recognizedText) async {
+        debugPrint('🎤 Voice command completed: "$recognizedText"');
+
+        // Parse the command
+        final command = _voiceCommand.parseCommand(recognizedText, roomNames);
+        debugPrint('🎤 Parsed command: $command');
+
+        if (command.isValid &&
+            command.startRoom != null &&
+            command.destinationRoom != null) {
+          // Find room IDs
+          final startRoom = rooms.firstWhere(
+            (r) => r.name == command.startRoom,
+            orElse: () => rooms.first,
+          );
+          final destRoom = rooms.firstWhere(
+            (r) => r.name == command.destinationRoom,
+            orElse: () => rooms.last,
+          );
+
+          // Set start and destination
+          setState(() {
+            _startRoomId = startRoom.id;
+            _destinationRoomId = destRoom.id;
+          });
+
+          // Compute route
+          await _recomputeRoute();
+          _markerAnimationController.repeat(reverse: true);
+          _pathAnimationController.forward();
+
+          // Build success message with floor information
+          final startFloorInfo = startRoom.floor != null
+              ? ' (Floor ${startRoom.floor})'
+              : '';
+          final destFloorInfo = destRoom.floor != null
+              ? ' (Floor ${destRoom.floor})'
+              : '';
+          final isCrossFloor = startRoom.floor != destRoom.floor;
+
+          String successMessage;
+          if (isCrossFloor) {
+            successMessage =
+                'Cross-floor navigation set from ${command.startRoom}$startFloorInfo to ${command.destinationRoom}$destFloorInfo. Starting navigation.';
+          } else {
+            successMessage =
+                'Navigation set from ${command.startRoom} to ${command.destinationRoom}. Starting navigation.';
+          }
+
+          await _voiceNav.speak(successMessage);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(successMessage)),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+
+          _announceNavigationStart();
+        } else {
+          // Failed to parse
+          debugPrint('❌ Failed to parse voice command');
+          const errorMessage =
+              'Oops! Your voice is unclear. Please repeat and say your start and destination room clearly.';
+          await _voiceNav.speak(
+            '$errorMessage For example, say: from room 101 to room 205.',
+          );
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.hearing_disabled, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            errorMessage,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Example: "from room 101 to room 205"',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 6),
+              ),
+            );
+          }
+        }
+      },
+      onError: (error) async {
+        debugPrint('❌ Voice command error: $error');
+        const errorMessage = 'Sorry, I could not understand. Please try again.';
+        await _voiceNav.speak(errorMessage);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(child: Text(errorMessage)),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// Announce navigation start with voice assistant
+  void _announceNavigationStart() {
+    debugPrint(
+      '🏢 Floor ${widget.floorNumber} - Voice enabled: $_voiceEnabled',
+    );
+    if (_voiceEnabled && _destinationRoomId != null) {
+      final provider = context.read<CampusProvider>();
+      final destRoom = provider.rooms.firstWhere(
+        (r) => r.id == _destinationRoomId,
+        orElse: () => throw StateError('Destination room not found'),
+      );
+
+      debugPrint('🏢 Calling voice navigation for: ${destRoom.name}');
+      _voiceNav.announceNavigationStart(destRoom.name);
+
+      // If we have route points for this floor, start turn-by-turn
+      if (_routeByFloor[widget.floorNumber] != null) {
+        debugPrint(
+          '🏢 Starting turn-by-turn on floor ${widget.floorNumber}, ${_routeByFloor[widget.floorNumber]!.length} points',
+        );
+        _voiceNav.startTurnByTurnNavigation(
+          _routeByFloor[widget.floorNumber]!,
+          destRoom.name,
+        );
+      } else {
+        debugPrint('🏢 No route points for floor ${widget.floorNumber}');
+      }
+    }
   }
 
   void _resetSelection() {
@@ -346,8 +584,8 @@ class _FloorMapScreenState extends State<FloorMapScreen>
       final destRoom = provider.roomById(_destinationRoomId!);
       final destRoomName = destRoom?.name ?? 'destination';
 
-      // Wait 5 seconds before showing dialog to let users view the path
-      Future.delayed(const Duration(seconds: 10), () {
+      // Wait 15 seconds before showing dialog to let users view the path
+      Future.delayed(const Duration(seconds: 15), () {
         if (mounted) {
           _showDestinationReachedDialog(destRoomName);
         }
@@ -381,6 +619,8 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     // Wait 5 seconds before showing dialog to let users view the path
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted) {
+        // Announce stairs warning
+        _voiceNav.speak('You are heading towards the stairs!');
         _showFloorTransitionDialog(nextFloor, destRoomName);
       }
     });
@@ -492,6 +732,12 @@ class _FloorMapScreenState extends State<FloorMapScreen>
             ),
             onPressed: () {
               Navigator.pop(dialogContext); // Close dialog
+
+              // Announce that user can review the path
+              _voiceNav.speak(
+                'Take your time to review the path. Click Continue when you are ready to proceed to the next floor.',
+              );
+
               setState(() {
                 _showMinimizedButton = true;
                 _showContinuePrompt = false;
@@ -637,6 +883,12 @@ class _FloorMapScreenState extends State<FloorMapScreen>
     // Clean up timers
     _continuePromptTimer?.cancel();
     _countdownTimer?.cancel();
+
+    // Announce floor transition
+    final destRoomName = _pendingDestRoomName ?? 'your destination';
+    _voiceNav.speak(
+      'Now switching to Floor $nextFloor. Continuing navigation to $destRoomName.',
+    );
 
     // Get floor title and image path based on floor number
     String floorTitle;
@@ -899,6 +1151,15 @@ class _FloorMapScreenState extends State<FloorMapScreen>
           appBar: AppBar(
             title: Text(widget.floorTitle),
             actions: [
+              // Voice command button
+              IconButton(
+                tooltip: 'Voice Command',
+                icon: Icon(
+                  _voiceCommand.isListening ? Icons.mic : Icons.mic_none,
+                  color: _voiceCommand.isListening ? Colors.red : null,
+                ),
+                onPressed: () => _handleVoiceCommand(context),
+              ),
               IconButton(
                 tooltip: 'Reset',
                 icon: const Icon(Icons.close),
@@ -1304,6 +1565,61 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                 ),
                               );
                             }),
+
+                            // Voice navigation toggle button
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: FloatingActionButton(
+                                mini: true,
+                                heroTag: 'voice_floor_btn',
+                                backgroundColor: _voiceEnabled
+                                    ? const Color(0xFF1976D2)
+                                    : Colors.grey,
+                                elevation: 4,
+                                tooltip: _voiceEnabled
+                                    ? 'Mute voice'
+                                    : 'Enable voice',
+                                onPressed: () {
+                                  setState(() {
+                                    _voiceEnabled = !_voiceEnabled;
+                                    _voiceNav.setEnabled(_voiceEnabled);
+                                  });
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: [
+                                          Icon(
+                                            _voiceEnabled
+                                                ? Icons.record_voice_over
+                                                : Icons.voice_over_off,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _voiceEnabled
+                                                ? 'Voice guidance enabled'
+                                                : 'Voice guidance muted',
+                                          ),
+                                        ],
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                      backgroundColor: _voiceEnabled
+                                          ? Colors.green
+                                          : Colors.grey,
+                                    ),
+                                  );
+                                },
+                                child: Icon(
+                                  _voiceEnabled
+                                      ? Icons.record_voice_over
+                                      : Icons.voice_over_off,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+
                             // Minimized floor transition button
                             if (_showMinimizedButton)
                               Positioned(
@@ -2350,6 +2666,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
                                               _pathAnimationController.forward(
                                                 from: 0.0,
                                               );
+                                              _announceNavigationStart();
                                             }
                                           : null,
                                       icon: const Icon(Icons.save, size: 16),
@@ -2701,6 +3018,7 @@ class _FloorMapScreenState extends State<FloorMapScreen>
         // Same floor, already in edit mode, OR has existing saved route - proceed normally
         await _recomputeRoute();
         _pathAnimationController.forward(from: 0.0);
+        _announceNavigationStart();
       }
     }
   }
@@ -3175,12 +3493,15 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
                                   index < currentIndex + floorRooms.length) {
                                 final roomIndex = index - currentIndex;
                                 final room = floorRooms[roomIndex];
-                                final isStartRoom = room.id == widget.selectedStartRoomId;
+                                final isStartRoom =
+                                    room.id == widget.selectedStartRoomId;
 
                                 return ListTile(
                                   enabled: !isStartRoom,
                                   leading: CircleAvatar(
-                                    backgroundColor: isStartRoom ? Colors.grey[300] : null,
+                                    backgroundColor: isStartRoom
+                                        ? Colors.grey[300]
+                                        : null,
                                     child: Text(
                                       room.name.replaceAll(
                                         RegExp(r'[^0-9]'),
@@ -3188,25 +3509,35 @@ class _RoomSelectionDialogState extends State<_RoomSelectionDialog> {
                                       ),
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: isStartRoom ? Colors.grey[600] : null,
+                                        color: isStartRoom
+                                            ? Colors.grey[600]
+                                            : null,
                                       ),
                                     ),
                                   ),
                                   title: Text(
                                     room.name,
                                     style: TextStyle(
-                                      color: isStartRoom ? Colors.grey[400] : null,
+                                      color: isStartRoom
+                                          ? Colors.grey[400]
+                                          : null,
                                     ),
                                   ),
                                   subtitle: Text(
-                                    isStartRoom ? '${room.type} (Already selected as start)' : room.type,
+                                    isStartRoom
+                                        ? '${room.type} (Already selected as start)'
+                                        : room.type,
                                     style: TextStyle(
-                                      color: isStartRoom ? Colors.grey[400] : null,
+                                      color: isStartRoom
+                                          ? Colors.grey[400]
+                                          : null,
                                     ),
                                   ),
-                                  onTap: isStartRoom ? null : () {
-                                    Navigator.pop(context, room.id);
-                                  },
+                                  onTap: isStartRoom
+                                      ? null
+                                      : () {
+                                          Navigator.pop(context, room.id);
+                                        },
                                 );
                               }
                               currentIndex += floorRooms.length;

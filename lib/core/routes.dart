@@ -13,6 +13,7 @@ import '../screens/landing_screen.dart';
 import '../screens/about_screen.dart';
 import '../screens/floorplan_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/user_manual_screen.dart';
 
 class AppRoutes {
   static const landing = '/landing';
@@ -37,6 +38,7 @@ class AppRoutes {
   static const labs = '/labs';
   static const admin = '/admin';
   static const about = '/about';
+  static const userManual = '/user-manual';
   static const floorplan = '/floorplan';
   static const login = '/login';
 
@@ -107,6 +109,7 @@ class AppRoutes {
     labs: (_) => const LabsScreen(),
     admin: (_) => const AdminScreen(),
     about: (_) => const AboutScreen(),
+    userManual: (_) => const UserManualScreen(),
     floorplan: (_) => const FloorplanScreen(),
     login: (_) => const LoginScreen(),
   };
