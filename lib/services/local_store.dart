@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LocalStore {
   static const _fileName = 'schedules.json';
@@ -100,20 +101,44 @@ class LocalStore {
   /// Returns the path to the exported file.
   static Future<String?> exportManualRoutesToDownloads() async {
     try {
-      final sourceFile = await _manualRoutesFile();
-      if (!await sourceFile.exists()) {
+      // Read the current manual routes (includes both bundled and local)
+      final routes = await readManualRoutes();
+
+      // If no routes, return null
+      if (routes.isEmpty) {
         return null;
       }
 
-      // Get external storage directory (accessible via file manager)
-      final externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) return null;
+      // Request storage permission for Android 10 and below
+      if (Platform.isAndroid) {
+        final sdkInt =
+            int.tryParse(
+              await Process.run('getprop', [
+                'ro.build.version.sdk',
+              ]).then((result) => result.stdout.toString().trim()),
+            ) ??
+            30;
 
-      // Copy to a publicly accessible location
-      final exportPath = '${externalDir.path}/manual_routes.json';
+        if (sdkInt <= 29) {
+          // Android 10 and below need storage permission
+          final status = await Permission.storage.request();
+          if (!status.isGranted) {
+            print('Storage permission denied');
+            return null;
+          }
+        }
+      }
 
-      await sourceFile.copy(exportPath);
-      return exportPath;
+      // Save to public Downloads folder
+      // For Android 10+, this path is accessible without special permissions
+      final downloadsPath = '/storage/emulated/0/Download/manual_routes.json';
+      final exportFile = File(downloadsPath);
+
+      // Write the complete routes data
+      final json = const JsonEncoder.withIndent('  ').convert(routes);
+      await exportFile.writeAsString(json, flush: true);
+
+      return downloadsPath;
     } catch (e) {
       print('Error exporting manual routes: $e');
       return null;

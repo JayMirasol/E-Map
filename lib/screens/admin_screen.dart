@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,13 @@ class AdminScreen extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.download_rounded, color: Colors.white),
+                tooltip: 'Export Manual Routes',
+                onPressed: () => _exportManualRoutes(context),
+              ),
+            ],
           ),
           floatingActionButton: Container(
             decoration: BoxDecoration(
@@ -247,6 +255,65 @@ class AdminScreen extends StatelessWidget {
         return 6;
       default:
         return 7;
+    }
+  }
+}
+
+Future<void> _exportManualRoutes(BuildContext context) async {
+  final provider = context.read<CampusProvider>();
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Exporting manual routes...'),
+      duration: Duration(seconds: 1),
+    ),
+  );
+
+  try {
+    // Get the routes content to count them
+    final content = await provider.getManualRoutesContent();
+
+    // Export to external storage
+    final exportPath = await provider.exportManualRoutes();
+
+    if (exportPath != null && context.mounted) {
+      // Count routes (rough estimate by counting keys)
+      int routeCount = 0;
+      if (content != null) {
+        try {
+          final data = jsonDecode(content);
+          if (data is Map) routeCount = data.length;
+        } catch (_) {}
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '✓ Downloaded $routeCount manual routes!\n\n'
+            'Location: Download folder\n'
+            'File: manual_routes.json\n\n'
+            'Open your file manager to access it.',
+          ),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
+        ),
+      );
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ No manual routes to export'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Export failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }

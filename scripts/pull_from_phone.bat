@@ -19,18 +19,27 @@ adb devices
 
 echo.
 echo Pulling file from phone...
-echo Looking in common Android app locations...
+echo.
+echo Step 1: Checking if file is already exported...
 
-REM Try to pull from app's internal storage
-adb pull /data/data/com.example.emap_mobile/app_flutter/manual_routes.json "%TEMP%\manual_routes_phone.json" 2>nul
-
-if not exist "%TEMP%\manual_routes_phone.json" (
-    echo File not found in app internal storage. Trying external storage...
-    adb pull /sdcard/Android/data/com.example.emap_mobile/files/manual_routes.json "%TEMP%\manual_routes_phone.json" 2>nul
-)
+REM First, try the exported location (from the app's Export button)
+adb pull /sdcard/Android/data/com.example.emap_mobile/files/manual_routes.json "%TEMP%\manual_routes_phone.json" 2>nul
 
 if not exist "%TEMP%\manual_routes_phone.json" (
-    echo File not found in external storage. Trying Downloads folder...
+    echo File not in exported location.
+    echo.
+    echo ============================================================
+    echo INSTRUCTIONS:
+    echo 1. Open E-Map app on your phone
+    echo 2. Go to Admin screen
+    echo 3. Tap the Download icon in the top-right corner
+    echo 4. Wait for "Manual routes exported" message
+    echo 5. Run this script again
+    echo ============================================================
+    echo.
+    echo Checking other common locations...
+    
+    REM Try Downloads folder as fallback
     adb pull /sdcard/Download/manual_routes.json "%TEMP%\manual_routes_phone.json" 2>nul
 )
 

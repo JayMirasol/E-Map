@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -157,7 +158,7 @@ class _Map2DScreenState extends State<Map2DScreen>
       }
     });
 
-    // Show destination dialog when first cycle completes, but keep animation running
+    // Show destination dialog when animation reaches destination
     _walkingAnimationController.addListener(() {
       // Check if first loop completed (reached destination)
       if (_walkingAnimationController.value >= 0.99 && !_destinationReached) {
@@ -165,12 +166,8 @@ class _Map2DScreenState extends State<Map2DScreen>
           setState(() {
             _destinationReached = true;
           });
-          // Wait 5 seconds to let users view the complete path animation
-          Future.delayed(const Duration(seconds: 10), () {
-            if (mounted) {
-              _showDestinationReachedDialog();
-            }
-          });
+          // Wait for voice navigation to complete before showing dialog
+          _waitForVoiceAndShowDialog();
         }
       }
     });
@@ -194,6 +191,24 @@ class _Map2DScreenState extends State<Map2DScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _autoDisplayRoute();
       });
+    }
+  }
+
+  // Wait for voice navigation to complete before showing dialog
+  Future<void> _waitForVoiceAndShowDialog() async {
+    // Keep animation looping while voice is speaking
+    if (_voiceEnabled && _voiceNav.isNavigating) {
+      debugPrint('🔊 Waiting for voice navigation to complete...');
+      // Wait for voice navigation to finish
+      while (_voiceNav.isNavigating && mounted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      debugPrint('🔊 Voice navigation completed, showing dialog');
+    }
+
+    // Show dialog after voice completes
+    if (mounted) {
+      _showDestinationReachedDialog();
     }
   }
 
@@ -283,13 +298,8 @@ class _Map2DScreenState extends State<Map2DScreen>
     _markerAnimationController.dispose();
     _walkingAnimationController.dispose();
 
-    // Restore all orientations
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeRight,
-      DeviceOrientation.landscapeLeft,
-    ]);
+    // Don't reset orientations here to allow smooth transition to floor screens
+    // The destination screen will set its own orientation preference
     super.dispose();
   }
 
@@ -401,19 +411,19 @@ class _Map2DScreenState extends State<Map2DScreen>
         } else {
           // Failed to parse
           debugPrint('❌ Failed to parse voice command');
-          const errorMessage =
-              'Oops! Your voice is unclear. Please repeat and say your start and destination building clearly.';
+          final errorMessage =
+              'Could not understand: "$recognizedText". Please say your start and destination building clearly.';
           await _voiceNav.speak(
-            '$errorMessage For example, say: from Main Building to NGO Building.',
+            'Sorry, I could not understand that. Please try again. For example, say: from Main Building to NGO Building.',
           );
 
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Row(
                   children: [
-                    Icon(Icons.hearing_disabled, color: Colors.white),
-                    SizedBox(width: 12),
+                    const Icon(Icons.hearing_disabled, color: Colors.white),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -421,10 +431,10 @@ class _Map2DScreenState extends State<Map2DScreen>
                         children: [
                           Text(
                             errorMessage,
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          SizedBox(height: 4),
-                          Text(
+                          const SizedBox(height: 4),
+                          const Text(
                             'Example: "from Main Building to NGO Building"',
                             style: TextStyle(fontSize: 12),
                           ),
@@ -434,7 +444,7 @@ class _Map2DScreenState extends State<Map2DScreen>
                   ],
                 ),
                 backgroundColor: Colors.orange,
-                duration: Duration(seconds: 6),
+                duration: const Duration(seconds: 6),
               ),
             );
           }
@@ -632,18 +642,359 @@ class _Map2DScreenState extends State<Map2DScreen>
     }
   }
 
-  void _showDestinationReachedDialog() {
+  void _showDestinationReachedDialog() async {
     final destLocation = _locations.firstWhere(
       (loc) => loc.id == _destinationLocationId,
       orElse: () =>
           CampusLocation(id: '', name: 'Destination', type: '', fx: 0, fy: 0),
     );
 
-    // Announce arrival
+    // Stop the animation and voice navigation first
+    _walkingAnimationController.stop();
+    _voiceNav.stopNavigation();
+
+    // Announce arrival and wait for it to complete
     if (_voiceEnabled) {
-      _voiceNav.announceArrival(destLocation.name);
+      await _voiceNav.announceArrival(destLocation.name);
     }
 
+    // Check if widget is still mounted after async operations
+    if (!mounted) return;
+
+    // Check if destination is a building
+    if (destLocation.type == 'building') {
+      _showBuildingConfirmationDialog(destLocation);
+    } else {
+      _showRegularDestinationDialog(destLocation);
+    }
+  }
+
+  void _showBuildingConfirmationDialog(CampusLocation building) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 32),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Destination Reached!')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Do you want to go to ${building.name}?',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.business, color: Colors.blue[700], size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      building.name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  // Stop the animation and reset
+                  _walkingAnimationController.stop();
+                  _walkingAnimationController.reset();
+                  setState(() {
+                    _showControls = true;
+                    _destinationReached = false;
+                    _isAnimating = false;
+                  });
+                },
+                child: const Text('No'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _showFloorSelectionDialog(building);
+                },
+                child: const Text('Yes'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.visibility),
+              label: const Text('See Direction First'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                // Show countdown and keep animation looping
+                _showCountdownAndAskAgain(building);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Speak the prompt message AFTER showing the dialog
+    if (_voiceEnabled) {
+      _voiceNav.speak("Do you want to go to ${building.name}?");
+    }
+  }
+
+  void _showCountdownAndAskAgain(CampusLocation building) {
+    int countdown = 10;
+
+    // Show initial snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Dialog will reappear in $countdown seconds...',
+          style: const TextStyle(fontSize: 16),
+        ),
+        duration: const Duration(seconds: 10),
+        backgroundColor: Colors.blue[700],
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    // Update countdown every second
+    Timer.periodic(const Duration(seconds: 1), (timer) {
+      countdown--;
+
+      if (countdown > 0) {
+        // Update snackbar
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Dialog will reappear in $countdown seconds...',
+              style: const TextStyle(fontSize: 16),
+            ),
+            duration: Duration(seconds: countdown),
+            backgroundColor: Colors.blue[700],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        timer.cancel();
+        // Show the dialog again
+        if (mounted && _destinationReached) {
+          _showBuildingConfirmationDialog(building);
+        }
+      }
+    });
+  }
+
+  void _showFloorSelectionDialog(CampusLocation building) {
+    List<Map<String, dynamic>> floors = [];
+
+    // Determine floors based on building
+    if (building.id == 'MAIN_BUILDING') {
+      floors = [
+        {'label': '1st Floor', 'route': '/floor1', 'floorNumber': 1},
+        {'label': '2nd Floor', 'route': '/floor2', 'floorNumber': 2},
+        {'label': '3rd Floor', 'route': '/floor3', 'floorNumber': 3},
+        {'label': '4th Floor', 'route': '/floor4', 'floorNumber': 4},
+      ];
+    } else if (building.id == 'NGO_BUILDING') {
+      floors = [
+        {'label': 'Ground Floor', 'route': '/ngo-ground', 'floorNumber': 5},
+        {'label': '2nd Floor', 'route': '/ngo-2nd', 'floorNumber': 6},
+      ];
+    } else if (building.id == 'PAGCOR_BUILDING') {
+      floors = [
+        {'label': '1st Floor', 'route': '/pagcor-1st', 'floorNumber': 7},
+        {'label': '2nd Floor', 'route': '/pagcor-2nd', 'floorNumber': 8},
+        {'label': '3rd Floor', 'route': '/pagcor-3rd', 'floorNumber': 9},
+        {'label': '4th Floor', 'route': '/pagcor-4th', 'floorNumber': 10},
+      ];
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('What floor in ${building.name}?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: floors.map((floor) {
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                onPressed: () async {
+                  // Set landscape orientation BEFORE closing dialog or navigating
+                  await SystemChrome.setPreferredOrientations([
+                    DeviceOrientation.landscapeRight,
+                    DeviceOrientation.landscapeLeft,
+                  ]);
+
+                  Navigator.pop(dialogContext);
+                  _navigateToFloor(floor['route'], floor['floorNumber']);
+                },
+                child: Text(
+                  floor['label'],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Reset state
+              _walkingAnimationController.stop();
+              _walkingAnimationController.reset();
+              setState(() {
+                _showControls = true;
+                _destinationReached = false;
+                _isAnimating = false;
+              });
+            },
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    // Speak the floor selection prompt AFTER showing the dialog
+    if (_voiceEnabled) {
+      _voiceNav.speak("What floor in ${building.name}?");
+    }
+  }
+
+  void _navigateToFloor(String route, int floorNumber) async {
+    // Orientation is already set to landscape before this method is called
+
+    // Stop animation and voice completely
+    _walkingAnimationController.stop();
+    _walkingAnimationController.reset();
+    _voiceNav.stopNavigation();
+
+    // Reset start and destination
+    setState(() {
+      _startLocationId = null;
+      _destinationLocationId = null;
+      _currentRoute = null;
+      _showControls = true;
+      _destinationReached = false;
+      _isAnimating = false;
+    });
+
+    // Determine floor screen parameters
+    String floorTitle = '';
+    String imagePath = '';
+
+    switch (route) {
+      case '/floor1':
+        floorTitle = 'Ground Floor';
+        imagePath = 'assets/images/1ST FLOOR.jpg';
+        break;
+      case '/floor2':
+        floorTitle = '2nd Floor: Main Building';
+        imagePath = 'assets/images/2ND FLOOR.jpg';
+        break;
+      case '/floor3':
+        floorTitle = '3rd Floor';
+        imagePath = 'assets/images/3RD FLOOR.jpg';
+        break;
+      case '/floor4':
+        floorTitle = '4th Floor';
+        imagePath = 'assets/images/4TH FLOOR.jpg';
+        break;
+      case '/ngo-ground':
+        floorTitle = 'NGO Building - Ground Floor';
+        imagePath =
+            'assets/images/NGO BUILDING/GROUNDFLOOR/NGO GROUND FLOOR.jpg';
+        break;
+      case '/ngo-2nd':
+        floorTitle = 'NGO Building - 2nd Floor';
+        imagePath = 'assets/images/NGO BUILDING/SECOND FLOOR/NGO 2ND FLOOR.jpg';
+        break;
+      case '/pagcor-1st':
+        floorTitle = 'PAGCOR Building - 1st Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 1ST FLOOR F.jpg';
+        break;
+      case '/pagcor-2nd':
+        floorTitle = 'PAGCOR Building - 2nd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 2ND FLOOR.jpg';
+        break;
+      case '/pagcor-3rd':
+        floorTitle = 'PAGCOR Building - 3rd Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 3RD FLOOR F.jpg';
+        break;
+      case '/pagcor-4th':
+        floorTitle = 'PAGCOR Building - 4th Floor';
+        imagePath = 'assets/images/PAGCOR BUILDING/BLDG 2 4TH FLOOR F.jpg';
+        break;
+    }
+
+    // Navigate with a small delay to ensure orientation is applied
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // Use pushReplacement to navigate
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FloorMapScreen(
+            floorNumber: floorNumber,
+            floorTitle: floorTitle,
+            imagePath: imagePath,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showRegularDestinationDialog(CampusLocation destLocation) {
     showDialog(
       context: context,
       barrierDismissible: false,

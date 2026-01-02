@@ -8,6 +8,7 @@ class VoiceNavigationService {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isEnabled = true;
   Timer? _instructionTimer;
+  Completer<void>? _speechCompleter;
 
   // Voice settings
   double _volume = 1.0;
@@ -47,13 +48,19 @@ class VoiceNavigationService {
       final languages = await _flutterTts.getLanguages;
       debugPrint('🔊 Available languages: $languages');
 
-      // Set completion handler to debug
+      // Set completion handler to complete the future
       _flutterTts.setCompletionHandler(() {
         debugPrint('🔊 Speech completed');
+        if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+          _speechCompleter!.complete();
+        }
       });
 
       _flutterTts.setErrorHandler((msg) {
         debugPrint('🔊 TTS Error: $msg');
+        if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+          _speechCompleter!.completeError(msg);
+        }
       });
 
       debugPrint('🔊 TTS initialization complete');
@@ -74,17 +81,47 @@ class VoiceNavigationService {
     }
 
     try {
+      // Create a new completer for this speech
+      _speechCompleter = Completer<void>();
+
       debugPrint('🔊 Calling TTS speak...');
       final result = await _flutterTts.speak(instruction);
       debugPrint('🔊 TTS speak result: $result');
+
+      // Wait for speech to complete (or timeout after 10 seconds)
+      await _speechCompleter!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('🔊 Speech timeout');
+        },
+      );
+
+      debugPrint('🔊 Speech finished');
     } catch (e) {
       debugPrint('🔊 Error speaking instruction: $e');
+    } finally {
+      _speechCompleter = null;
     }
   }
 
   /// Stop current speech
   Future<void> stop() async {
     await _flutterTts.stop();
+  }
+
+  /// Stop all navigation including timers and speech
+  Future<void> stopNavigation() async {
+    debugPrint('🔊 Stopping navigation...');
+    _instructionTimer?.cancel();
+    _instructionTimer = null;
+    await _flutterTts.stop();
+    if (_speechCompleter != null && !_speechCompleter!.isCompleted) {
+      _speechCompleter!.complete();
+    }
+    if (_navigationCompleter != null && !_navigationCompleter!.isCompleted) {
+      _navigationCompleter!.complete();
+    }
+    debugPrint('🔊 Navigation stopped');
   }
 
   /// Announce start of navigation
@@ -100,7 +137,14 @@ class VoiceNavigationService {
     await speak("You have arrived at $destination.");
   }
 
+  Completer<void>? _navigationCompleter;
+
+  /// Check if navigation is currently in progress
+  bool get isNavigating =>
+      _navigationCompleter != null && !_navigationCompleter!.isCompleted;
+
   /// Generate and announce turn-by-turn instructions from route points
+  /// Now waits for each instruction to finish speaking before moving to the next
   Future<void> startTurnByTurnNavigation(
     List<Offset> routePoints,
     String destinationName, {
@@ -108,27 +152,50 @@ class VoiceNavigationService {
   }) async {
     if (routePoints.length < 2) return;
 
+    // Create completer for tracking navigation completion
+    _navigationCompleter = Completer<void>();
+
+    // Cancel any existing timer
+    _instructionTimer?.cancel();
+
     // Generate all instructions
     final instructions = _generateInstructions(routePoints, destinationName);
 
-    // Announce first instruction immediately
-    if (instructions.isNotEmpty) {
-      await speak(instructions[0]);
-    }
+    // Speak each instruction sequentially, waiting for each to complete
+    // This ensures animation follows the voice assistant's pace
+    debugPrint(
+      '🔊 Starting turn-by-turn navigation with ${instructions.length} instructions',
+    );
 
-    // Schedule remaining instructions at intervals
-    _instructionTimer?.cancel();
-    int instructionIndex = 1;
-
-    _instructionTimer = Timer.periodic(instructionInterval, (timer) async {
-      if (instructionIndex >= instructions.length) {
-        timer.cancel();
-        return;
+    for (int i = 0; i < instructions.length; i++) {
+      // Check if navigation was stopped
+      if (_navigationCompleter == null || _navigationCompleter!.isCompleted) {
+        debugPrint('🔊 Navigation was stopped, exiting turn-by-turn');
+        break;
       }
 
-      await speak(instructions[instructionIndex]);
-      instructionIndex++;
-    });
+      debugPrint(
+        '🔊 Speaking instruction ${i + 1}/${instructions.length}: "${instructions[i]}"',
+      );
+
+      // Wait for the instruction to finish speaking
+      await speak(instructions[i]);
+
+      // Add a small pause between instructions (1.5 seconds)
+      // This gives users time to process the instruction
+      if (i < instructions.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
+    }
+
+    // Complete the navigation
+    if (_navigationCompleter != null && !_navigationCompleter!.isCompleted) {
+      _navigationCompleter!.complete();
+      debugPrint('🔊 Turn-by-turn navigation completed');
+    }
+
+    // Return the future that completes when navigation is done
+    return _navigationCompleter!.future;
   }
 
   /// Generate navigation instructions from route points
